@@ -1,6 +1,6 @@
 # TypeScript backend on NestJS, Python Telegram bot on aiogram
 
-We want both Python and TypeScript across Kitty, so one service gets each language. `kitty-backend` is TypeScript on NestJS with the Express adapter, running on Node 26 LTS, and `kitty-telegram-bot` is Python on aiogram. NestJS gives the backend its modules and DI container, so the backend's architecture works inside that structure and is not designed from a bare HTTP framework. The split costs two toolchains, two test setups, and two sets of dependency updates, and no types can be shared between the services, so they need an explicit API contract. Changing either language later means rewriting that service.
+We want both Python and TypeScript across Kitty, so one service gets each language. `kitty-backend` is TypeScript on NestJS with the Express adapter, running on Node 26 LTS, and `kitty-telegram-bot` is Python on aiogram. We chose NestJS because we already know it. It gives the backend its modules and DI container, so the backend's architecture works inside that structure and is not designed from a bare HTTP framework. The split costs two toolchains, two test setups, and two sets of dependency updates, and no types can be shared between the services, so they need an explicit API contract. Changing either language later means rewriting that service.
 
 ## Considered Options
 
