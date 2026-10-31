@@ -30,6 +30,10 @@ _Avoid_: Invite link, Telegram link
 A place that holds one User's money, such as cash or a bank account, with an opening balance. It belongs to the User, not to a Group, so one Account can pay for Expenses in many Groups.
 _Avoid_: Wallet, source, bank
 
+**Default Account**:
+The one Account of a User that receives Loans and Settlements paid to them. Every User always has one.
+_Avoid_: Main account, primary account
+
 ## Transactions
 
 **Transaction**:
@@ -56,7 +60,19 @@ _Avoid_: Lending, advance, credit
 Money one Member pays another inside a Group to reduce either their Shared balance or their Loan balance, and it says which one. A loan Settlement reduces the overall Loan balance, not a specific Loan.
 _Avoid_: Payback, reimbursement, repayment
 
+**Posting**:
+One signed amount on one Ledger account. A Transaction has two or more Postings, and each User's Postings on it sum to zero.
+_Avoid_: Entry, row, line
+
+**Ledger account**:
+Anything Postings add up to, such as a User's Account, a User's Category total, or what one Member owes another.
+_Avoid_: Account, bucket
+
 ## Balances
+
+**Account balance**:
+The money an Account holds: its opening balance plus all its Postings.
+_Avoid_: Wallet balance, funds
 
 **Shared balance**:
 What one Member owes another in a Group because of Expense Shares.
