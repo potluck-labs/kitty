@@ -12,6 +12,10 @@ _Avoid_: Customer, Telegram user, profile
 An app a User talks to Kitty through, such as Telegram. A User links one or more Channel identities.
 _Avoid_: Platform, client, frontend, messenger
 
+**Channel identity**:
+A User's account in one Channel, such as a Telegram account. A User can have several, one per Channel.
+_Avoid_: Telegram user, login, handle
+
 **Group**:
 A set of one or more people who record shared Transactions together. A Group with one person is a personal ledger.
 _Avoid_: Team, household, room
@@ -23,6 +27,14 @@ _Avoid_: Participant, groupmate
 **Invite code**:
 A code Kitty issues so a User can join a Group. A Channel may show it as a link, but the code belongs to Kitty.
 _Avoid_: Invite link, Telegram link
+
+**Channel chat**:
+A conversation in a Channel that is linked to one Group, such as a Telegram group chat. Being in the chat does not make someone a Member.
+_Avoid_: Group chat, room
+
+**Notification**:
+A message Kitty sends to a User or a Group through a Channel, such as telling Ben what his Share of an Expense is.
+_Avoid_: Alert, push, message
 
 ## Money holders
 
