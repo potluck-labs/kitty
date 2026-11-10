@@ -1,0 +1,685 @@
+<!doctype html>
+<!--
+  PROTOTYPE. Throwaway. Lives only on branch prototype/telegram-recording, never on main.
+  Question: what should recording an Expense, Transfer, Income, Loan, and Settlement look like in Telegram?
+  Plan: four variants (A commands, B guided buttons, C one-line syntax, D line then card), switchable via ?variant=,
+  each shown in a private chat and in a group chat, for all five kinds. Open this file in a browser. No server, no build.
+  Requests in the side panel are illustrative. Real endpoints belong to "Endpoints and Notification types in the Channel API".
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PROTOTYPE: recording Transactions in Telegram</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f2f2f5; color: #1c1c1e; padding-bottom: 80px; }
+  header { padding: 12px 20px; background: #fff; border-bottom: 1px solid #ddd; }
+  header h1 { margin: 0; font-size: 17px; }
+  header p { margin: 4px 0 0; color: #666; font-size: 13px; }
+  .controls { display: flex; gap: 18px; flex-wrap: wrap; padding: 10px 20px; background: #fff; border-bottom: 1px solid #ddd; align-items: center; }
+  .seg { display: inline-flex; border: 1px solid #c7c7cc; border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; background: #fff; padding: 6px 12px; cursor: pointer; font: inherit; border-right: 1px solid #c7c7cc; }
+  .seg button:last-child { border-right: 0; }
+  .seg button.on { background: #2f80ed; color: #fff; }
+  .lbl { color: #888; font-size: 12px; margin-right: 6px; }
+  main { display: grid; grid-template-columns: minmax(360px, 480px) 1fr; gap: 20px; padding: 20px; max-width: 1300px; }
+  .phone { background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+  .phone .top { padding: 10px 14px; border-bottom: 1px solid #e5e5e5; }
+  .phone .top b { display: block; }
+  .phone .top span { color: #888; font-size: 12px; }
+  .chat { background: #c9d9c0; padding: 12px 10px; min-height: 560px; display: flex; flex-direction: column; gap: 6px; }
+  .row { display: flex; flex-direction: column; cursor: pointer; border-radius: 10px; padding: 2px; }
+  .row.sel { outline: 2px dashed #2f80ed; outline-offset: 1px; }
+  .row.me { align-items: flex-end; }
+  .row.other { align-items: flex-start; }
+  .row.center { align-items: center; }
+  .row.later { opacity: .35; }
+  .bubble { max-width: 86%; padding: 6px 10px 6px; border-radius: 12px; background: #fff; white-space: pre-wrap; box-shadow: 0 1px 1px rgba(0,0,0,.12); }
+  .me .bubble { background: #e1ffc7; }
+  .bubble.hidden { background: #eee; color: #777; border: 1px dashed #999; }
+  .who { font-size: 12px; font-weight: 600; color: #2f80ed; margin-bottom: 2px; }
+  .who.bot { color: #c0392b; }
+  .tag { display: inline-block; font-size: 11px; color: #666; background: rgba(0,0,0,.06); padding: 1px 6px; border-radius: 6px; margin-top: 4px; }
+  .quote { border-left: 3px solid #2f80ed; padding-left: 6px; color: #555; font-size: 12px; margin-bottom: 4px; }
+  .kb { display: flex; flex-direction: column; gap: 3px; margin-top: 3px; max-width: 86%; width: 86%; }
+  .kb .kr { display: flex; gap: 3px; }
+  .kb .k { flex: 1; text-align: center; background: rgba(60,80,60,.45); color: #fff; border-radius: 8px; padding: 6px 4px; font-size: 13px; }
+  .kb.reply .k { background: #fff; color: #222; border: 1px solid #ccc; }
+  .ann { font-size: 12px; color: #2b3a2b; background: rgba(255,255,255,.55); border-radius: 10px; padding: 3px 10px; max-width: 92%; text-align: center; }
+  .ann .chip { display: inline-block; background: rgba(60,80,60,.7); color: #fff; padding: 0 8px; border-radius: 6px; }
+  .ann.toast { background: #333; color: #fff; }
+  .ann.notif { background: #fff7d6; text-align: left; border: 1px solid #e0c96b; }
+  .ann.sys { background: #ffe3e0; color: #7a271a; }
+  .edited { font-size: 11px; color: #888; }
+  .panel { display: flex; flex-direction: column; gap: 14px; }
+  .card { background: #fff; border-radius: 12px; padding: 12px 14px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  .card h2 { font-size: 14px; margin: 0 0 8px; }
+  .card ul { margin: 0; padding-left: 18px; }
+  .card li { margin: 3px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid #eee; }
+  tr.cur td { background: #eaf2fe; font-weight: 600; }
+  pre { margin: 0; background: #f6f8fa; border-radius: 8px; padding: 8px; font-size: 12px; overflow: auto; max-height: 340px; white-space: pre-wrap; }
+  code { background: #f0f0f0; padding: 0 4px; border-radius: 4px; }
+  .muted { color: #888; font-size: 12px; }
+  #switcher { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #111; color: #fff; border-radius: 999px; padding: 6px 8px; display: flex; align-items: center; gap: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.35); z-index: 10; font-size: 14px; }
+  #switcher button { background: #333; color: #fff; border: 0; border-radius: 999px; width: 34px; height: 34px; cursor: pointer; font-size: 16px; }
+  #switcher span { min-width: 260px; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>PROTOTYPE: recording Transactions in Telegram</h1>
+  <p>Throwaway. Ticket "How recording an Expense feels in Telegram". The cast is Ana, Ben, and Cara in the Group "Flat 3B", whose Telegram group chat is linked to it. Ana and Ben also share the Group "Lisbon trip". Ana has the Accounts Cash (Default Account, €60.00) and Bank (€2,040.00). Use the left and right arrow keys or the bottom bar to switch variants. Click any step to see the state at that point.</p>
+</header>
+<div class="controls">
+  <div><span class="lbl">Chat</span><span class="seg" id="chatSeg"></span></div>
+  <div><span class="lbl">Kind</span><span class="seg" id="kindSeg"></span></div>
+  <div><span class="lbl">View</span><span class="seg" id="viewSeg"></span></div>
+</div>
+<main>
+  <div class="phone">
+    <div class="top"><b id="chatTitle"></b><span id="chatSub"></span></div>
+    <div class="chat" id="chat"></div>
+  </div>
+  <div class="panel">
+    <div class="card"><h2 id="vTitle"></h2><ul id="vNotes"></ul></div>
+    <div class="card"><h2>Cost of this kind, all variants, this chat</h2><table id="cmp"></table>
+      <p class="muted">Actions are messages typed plus buttons tapped by people. Chat messages are messages left in the chat history, from people and the bot. Edits replace a bot message in place and add nothing to the history.</p></div>
+    <div class="card"><h2>This transcript</h2><ul id="tNotes"></ul></div>
+    <div class="card"><h2>State at the selected step</h2><div class="muted" id="stepLbl"></div>
+      <p><b>Draft in the bot (aiogram FSM in Redis)</b></p><pre id="draft"></pre>
+      <p><b>Calls to the backend so far (illustrative shapes)</b></p><pre id="reqs"></pre></div>
+    <div class="card"><h2>Questions this prototype raises</h2><ol id="questions"></ol></div>
+  </div>
+</main>
+<div id="switcher"><button id="prev" title="Previous variant">&larr;</button><span id="vLabel"></span><button id="next" title="Next variant">&rarr;</button></div>
+
+<script>
+// ---------- builders ----------
+const U = (w, t, o = {}) => ({ ty: 'u', w, t, ...o });              // person sends a message
+const R = (w, re, t, o = {}) => ({ ty: 'u', w, t, re, ...o });       // person replies to a bot message
+const UE = (w, t, o = {}) => ({ ty: 'uedit', w, t, ...o });          // person edits their own earlier message
+const B = (id, t, kb, o = {}) => ({ ty: 'b', id, t, kb, ...o });     // bot sends a message
+const E = (id, t, kb, o = {}) => ({ ty: 'e', id, t, kb, ...o });     // bot edits its message in place
+const T = (w, id, btn, o = {}) => ({ ty: 'tap', w, id, btn, ...o }); // person taps an inline button
+const X = (w, t) => ({ ty: 'toast', w, t });                         // popup only the presser sees
+const S = (t) => ({ ty: 'sys', t });                                 // prototype note inside the chat
+const N = (w, t) => ({ ty: 'notif', w, t });                         // Notification sent to someone's private chat
+
+const ACTOR = { Ana: '7001', Ben: '7002', Cara: '7003' };
+const GCHAT = '-1001234567';
+const call = (method, who, key, body, extra = {}) => ({ method, path: extra.path || '/v1/transactions', headers: { 'Kitty-Actor': ACTOR[who], ...(key ? { 'Idempotency-Key': key } : {}), ...(extra.ifMatch ? { 'If-Match': extra.ifMatch } : {}) }, ...(body ? { body } : {}) });
+const read = (who, path) => ({ method: 'GET', path, headers: { 'Kitty-Actor': ACTOR[who] } });
+const all3 = ['<Ana>', '<Ben>', '<Cara>'];
+const exp = (o) => ({ kind: 'expense', group: '<Flat 3B>', amount: 3690, payer: '<Ana>', account: '<Ana: Cash>', category: '<Groceries>', merchant: 'Lidl', split: { rule: 'equal', members: all3 }, ...o });
+const loan = (o) => ({ kind: 'loan', group: '<Flat 3B>', amount: 5000, lender: '<Ana>', borrower: '<Ben>', account: '<Ana: Bank>', ...o });
+const settle = (o) => ({ kind: 'settlement', group: '<Flat 3B>', balance: 'shared', amount: 2340, payer: '<Ben>', payee: '<Ana>', account: '<Ben: Cash>', ...o });
+const transfer = { kind: 'transfer', amount: 20000, from_account: '<Ana: Bank>', to_account: '<Ana: Cash>' };
+const income = { kind: 'income', amount: 240000, account: '<Ana: Bank>' };
+const tg = (chat, msg) => `tg:${chat}:${msg}`;
+const PRIV = '7001'; // private chat id equals the user id
+const uuid = (n) => `0193a7e2-5c1d-7f00-8000-00000000000${n}`;
+
+const OPEN_PRIVATE = [['Open private chat']];
+const REC_EXP = 'Saved: Expense in Flat 3B\n€36.90 Groceries at Lidl\nPaid by Ana from Cash\nSplit equally: Ana €12.30, Ben €12.30, Cara €12.30';
+const REC_TRANSFER = 'Saved: Transfer\n€200.00 from Bank to Cash\nBank: €1,840.00\nCash: €260.00';
+const REC_INCOME = 'Saved: Income\n€2,400.00 into Bank\nBank: €4,440.00';
+const REC_LOAN = 'Saved: Loan in Flat 3B\nAna lent Ben €50.00 from Bank\nIt went to Ben\'s Default Account\nLoan balance: Ben owes Ana €50.00';
+const REC_SETTLE_BEN = 'Saved: Settlement in Flat 3B\nBen paid Ana €23.40 from Cash, shared balance\nShared balance: Ben and Ana are settled';
+const REC_SETTLE_CARA = 'Saved: Settlement in Flat 3B\nAna paid Cara €15.00 from Cash, shared balance\nShared balance: Ana owes Cara €4.20';
+const N_EXP_BEN = 'To Ben: Ana added an Expense in Flat 3B. €36.90 Groceries at Lidl. Your Share: €12.30. (Only if Notifications cover new Expenses, which is open.)';
+const N_LOAN_BEN = 'To Ben: Ana recorded a Loan in Flat 3B. Ana lent you €50.00. It went to your Default Account, Cash. Loan balance: you owe Ana €50.00.';
+const N_SETTLE_CARA = 'To Cara: Ana recorded a Settlement in Flat 3B. Ana paid you €15.00. It went to your Default Account, Cash. Shared balance: Ana owes you €4.20.';
+const ED = [['Edit', 'Delete']];
+const CATS = [['Groceries', 'Eating out'], ['Household', 'Utilities'], ['Transport', 'More']];
+
+// ---------- variants ----------
+const VARIANTS = {
+  A: {
+    name: 'Commands',
+    how: [
+      'One command per kind, with a fixed argument order and <code>key:value</code> options. The bot saves at once and replies with a receipt.',
+      'Expense: <code>/expense 36.90 groceries at:lidl from:bank split:ana,ben in:flat3b</code>. Transfer: <code>/transfer 200 bank cash</code>. Income: <code>/income 2400 bank</code>. Loan: <code>/loan 50 ben from:bank</code>. Settlement: <code>/settle 23.40 ana shared</code>.',
+      'Defaults: the sender is the Payer, the Default Account pays, the Split is equal among all Members, the Group is the chat\'s Group.',
+      'Fast once learned: one message of about 30 characters. Telegram lists the commands in its menu, which helps people find them.',
+      'Hard to learn. The usage reply is the only help, and a mistake costs a full retype.',
+      'Works in groups with privacy mode on, because commands addressed to the bot reach it.',
+      'In a private chat with two or more Groups, every Expense, Loan, and Settlement needs <code>in:</code>, so each Group needs a short handle like <code>flat3b</code>.',
+      'No draft state in the bot. The Idempotency-Key is <code>tg:&lt;chat_id&gt;:&lt;message_id&gt;</code>.',
+    ],
+    t: {
+      group: {
+        expense: { notes: ['Ben\'s first try fails and he retypes the whole line.'], steps: [
+          U('Ana', '/expense 36.90 groceries at:lidl', { req: call('POST', 'Ana', tg(GCHAT, 501), exp({})) }),
+          B('r1', REC_EXP, ED),
+          U('Ben', '/expense groceries 8'),
+          B('r2', 'I could not read that. Use:\n/expense <amount> <category> [at:merchant] [from:account] [split:names]\nExample: /expense 8 groceries split:ben,cara'),
+          U('Ben', '/expense 8 groceries split:ben,cara', { req: call('POST', 'Ben', tg(GCHAT, 504), exp({ amount: 800, payer: '<Ben>', account: '<Ben: Cash>', merchant: null, split: { rule: 'equal', members: ['<Ben>', '<Cara>'] } })) }),
+          B('r3', 'Saved: Expense in Flat 3B\n€8.00 Groceries\nPaid by Ben from Cash\nSplit equally: Ben €4.00, Cara €4.00', ED),
+        ] },
+        transfer: { notes: ['A Transfer has no Group, and it shows Account names and balances, so the bot moves it to the private chat.'], steps: [
+          U('Ana', '/transfer 200 bank cash'),
+          B('r1', 'Transfers are between your own Accounts, so I record them only in our private chat.', OPEN_PRIVATE),
+          S('Ana\'s message stays in the group. A bot that is not an admin cannot delete other people\'s messages.'),
+        ] },
+        income: { notes: ['Same as Transfer: Income has no Group.'], steps: [
+          U('Ana', '/income 2400 bank'),
+          B('r1', 'Income goes into your own Account, so I record it only in our private chat.', OPEN_PRIVATE),
+          S('The amount Ana earns is now in the group\'s history.'),
+        ] },
+        loan: { notes: ['The group sees the Loan as it happens, so a private Notification to Ben may be redundant.'], steps: [
+          U('Ana', '/loan 50 ben from:bank', { req: call('POST', 'Ana', tg(GCHAT, 510), loan({})) }),
+          B('r1', REC_LOAN, ED),
+        ] },
+        settlement: { who: 'Ben', notes: ['Ben owes Ana on both balances, so the bot can\'t guess which one he means.'], steps: [
+          U('Ben', '/settle 23.40 ana'),
+          B('r1', 'Is this for the shared balance or the loan balance? Add shared or loan:\n/settle 23.40 ana shared'),
+          U('Ben', '/settle 23.40 ana shared', { req: call('POST', 'Ben', tg(GCHAT, 522), settle({})) }),
+          B('r2', REC_SETTLE_BEN, ED),
+        ] },
+      },
+      private: {
+        expense: { notes: ['Ana is in two Groups, so the bot can\'t pick one. Each Group needs a short handle to type.'], steps: [
+          U('Ana', '/expense 36.90 groceries at:lidl'),
+          B('r1', 'You are in 2 Groups. Say which one with in:\n/expense 36.90 groceries at:lidl in:flat3b\nYour Groups: flat3b (Flat 3B), lisbon (Lisbon trip)'),
+          U('Ana', '/expense 36.90 groceries at:lidl in:flat3b', { req: call('POST', 'Ana', tg(PRIV, 41), exp({})) }),
+          B('r2', REC_EXP, ED),
+          N('Ben', N_EXP_BEN),
+        ] },
+        transfer: { steps: [
+          U('Ana', '/transfer 200 bank cash', { req: call('POST', 'Ana', tg(PRIV, 42), transfer) }),
+          B('r1', REC_TRANSFER, ED),
+        ] },
+        income: { notes: ['There is nowhere to say where the money came from. The glossary has no note field on any Transaction.'], steps: [
+          U('Ana', '/income 2400 bank', { req: call('POST', 'Ana', tg(PRIV, 43), income) }),
+          B('r1', REC_INCOME, ED),
+        ] },
+        loan: { steps: [
+          U('Ana', '/loan 50 ben from:bank in:flat3b', { req: call('POST', 'Ana', tg(PRIV, 44), loan({})) }),
+          B('r1', REC_LOAN, ED),
+          N('Ben', N_LOAN_BEN),
+        ] },
+        settlement: { steps: [
+          U('Ana', '/settle 15 cara shared in:flat3b', { req: call('POST', 'Ana', tg(PRIV, 45), settle({ amount: 1500, payer: '<Ana>', payee: '<Cara>', account: '<Ana: Cash>' })) }),
+          B('r1', REC_SETTLE_CARA, ED),
+          N('Cara', N_SETTLE_CARA),
+        ] },
+      },
+    },
+  },
+
+  B: {
+    name: 'Guided buttons',
+    how: [
+      'Start with a command, or in the private chat with the keyboard menu, then answer one question per step. Choices are buttons. Nothing is saved until Save.',
+      'No syntax to learn. Categories, Accounts, Groups, and Members come from the backend as buttons, so names can\'t be mistyped.',
+      'The most actions: 6 to 14 per Expense.',
+      'A typed step, such as the amount or a Merchant, needs a new bot message. Telegram allows a "reply to this" prompt only on a new message, not by editing one. In groups, each typed step adds two messages and counts toward the 20 messages per minute limit.',
+      'In groups the amount must come as a reply to the bot\'s message, because privacy mode hides plain text.',
+      'Needs a draft in Redis, and on every button press a check that the presser owns the draft.',
+      'A Settlement can offer the exact balance as a button, so nothing is typed.',
+      'The preview can\'t say who gets a leftover cent, because the backend picks at random on save.',
+    ],
+    t: {
+      group: {
+        expense: { notes: ['Ben taps a button on Ana\'s draft and only he sees the refusal.', '€37.00 doesn\'t split evenly, so the preview can\'t say who pays the extra cent.'], steps: [
+          U('Ana', '/expense', { st: { flow: 'expense', owner: 'Ana', draft_id: uuid(1), step: 'amount' } }),
+          B('m1', 'Ana is adding an Expense in Flat 3B.\nReply to this message with the amount.', null, { fr: 'Ana' }),
+          R('Ana', 'm1', '37', { st: { amount: 3700, step: 'category' } }),
+          B('m2', 'Expense by Ana in Flat 3B: €37.00\nCategory?', CATS),
+          T('Ben', 'm2', 'Eating out'),
+          X('Ben', 'Only Ana can change this draft.'),
+          T('Ana', 'm2', 'Groceries', { st: { category: 'Groceries', step: 'split' } }),
+          E('m2', 'Expense by Ana: €37.00 Groceries\nSplit?', [['Equally, all 3'], ['Choose people'], ['Percentages', 'Exact amounts']]),
+          T('Ana', 'm2', 'Equally, all 3', { st: { split: { rule: 'equal', members: ['Ana', 'Ben', 'Cara'] }, step: 'account' } }),
+          E('m2', 'Expense by Ana: €37.00 Groceries, split equally\nPaid from?', [['Cash (default)', 'Bank']]),
+          T('Ana', 'm2', 'Cash (default)', { st: { account: 'Cash', step: 'confirm' } }),
+          E('m2', 'Expense by Ana in Flat 3B\n€37.00 Groceries\nPaid from Cash\nSplit equally: €12.33 each, and 1 cent goes to one of you at random\nMerchant: none', [['Add merchant'], ['Save', 'Cancel']]),
+          T('Ana', 'm2', 'Save', { st: { step: 'saved' }, req: call('POST', 'Ana', uuid(1), exp({ amount: 3700, merchant: null })) }),
+          E('m2', 'Saved: Expense in Flat 3B\n€37.00 Groceries\nPaid by Ana from Cash\nAna €12.33, Ben €12.34, Cara €12.33', ED),
+        ] },
+        transfer: { notes: ['The deep link can carry "transfer" as its start parameter, so the private chat opens straight into the Transfer flow.'], steps: [
+          U('Ana', '/transfer'),
+          B('m1', 'Transfers are between your own Accounts. Tap to continue in our private chat.', OPEN_PRIVATE),
+        ] },
+        income: { steps: [
+          U('Ana', '/income'),
+          B('m1', 'Income goes into your own Account. Tap to continue in our private chat.', OPEN_PRIVATE),
+        ] },
+        loan: { notes: ['Three bot messages for one Loan, because the typed amount needs its own prompt message.'], steps: [
+          U('Ana', '/loan', { st: { flow: 'loan', owner: 'Ana', draft_id: uuid(2), step: 'borrower' } }),
+          B('m1', 'Ana is recording a Loan in Flat 3B. Who gets the money?', [['Ben', 'Cara']]),
+          T('Ana', 'm1', 'Ben', { st: { borrower: 'Ben', step: 'amount' } }),
+          E('m1', 'Loan in Flat 3B: Ana lends Ben.', null),
+          B('m2', 'Ana, reply with the amount.', null, { fr: 'Ana' }),
+          R('Ana', 'm2', '50', { st: { amount: 5000, step: 'account' } }),
+          B('m3', 'Ana lends Ben €50.00. From?', [['Cash (default)', 'Bank']]),
+          T('Ana', 'm3', 'Bank', { st: { account: 'Bank', step: 'confirm' } }),
+          E('m3', 'Loan in Flat 3B\nAna lends Ben €50.00 from Bank\nIt goes to Ben\'s Default Account', [['Save', 'Cancel']]),
+          T('Ana', 'm3', 'Save', { st: { step: 'saved' }, req: call('POST', 'Ana', uuid(2), loan({})) }),
+          E('m3', REC_LOAN, ED),
+        ] },
+        settlement: { who: 'Ben', notes: ['Ben types nothing. The bot reads his balances and offers them as buttons.'], steps: [
+          U('Ben', '/settle', { st: { flow: 'settlement', owner: 'Ben', draft_id: uuid(3), step: 'pick' }, req: read('Ben', '/v1/groups/<Flat 3B>/balances') }),
+          B('m1', 'Ben is settling up in Flat 3B. Your balances:\nYou owe Ana €23.40 (shared)\nYou owe Ana €50.00 (loan)\nCara owes you €8.10 (shared)', [['Pay Ana €23.40, shared'], ['Pay Ana €50.00, loan'], ['Other amount']]),
+          T('Ben', 'm1', 'Pay Ana €23.40, shared', { st: { payee: 'Ana', amount: 2340, balance: 'shared', step: 'account' } }),
+          E('m1', 'Ben pays Ana €23.40 for the shared balance. From?', [['Cash (default)', 'Bank']]),
+          T('Ben', 'm1', 'Cash (default)', { st: { account: 'Cash', step: 'confirm' } }),
+          E('m1', 'Settlement in Flat 3B\nBen pays Ana €23.40 from Cash, shared balance', [['Save', 'Cancel']]),
+          T('Ben', 'm1', 'Save', { st: { step: 'saved' }, req: call('POST', 'Ben', uuid(3), settle({})) }),
+          E('m1', REC_SETTLE_BEN, ED),
+        ] },
+      },
+      private: {
+        expense: { notes: ['The private chat has a keyboard menu under the text field. Tapping "Expense" sends the word as a message.', 'After Ana types, the bot sends a new message so the flow stays at the bottom of the chat.'], steps: [
+          U('Ana', 'Expense', { menu: true, st: { flow: 'expense', owner: 'Ana', draft_id: uuid(4), step: 'group' } }),
+          B('m1', 'New Expense. Which Group?', [['Flat 3B', 'Lisbon trip'], ['Just me']]),
+          T('Ana', 'm1', 'Flat 3B', { st: { group: 'Flat 3B', step: 'amount' } }),
+          E('m1', 'Expense in Flat 3B. Send the amount.', null),
+          U('Ana', '36,90', { st: { amount: 3690, step: 'category' } }),
+          B('m2', 'Expense in Flat 3B: €36.90\nCategory?', CATS),
+          T('Ana', 'm2', 'Groceries', { st: { category: 'Groceries', step: 'split' } }),
+          E('m2', '€36.90 Groceries\nSplit?', [['Equally, all 3'], ['Choose people'], ['Percentages', 'Exact amounts']]),
+          T('Ana', 'm2', 'Choose people'),
+          E('m2', '€36.90 Groceries\nWho shares it? Tap to toggle.', [['[x] Ana', '[x] Ben', '[x] Cara'], ['Done']]),
+          T('Ana', 'm2', '[x] Cara'),
+          E('m2', '€36.90 Groceries\nWho shares it? Tap to toggle.', [['[x] Ana', '[x] Ben', '[ ] Cara'], ['Done']]),
+          T('Ana', 'm2', 'Done', { st: { split: { rule: 'equal', members: ['Ana', 'Ben'] }, step: 'account' } }),
+          E('m2', '€36.90 Groceries, split between Ana and Ben\nPaid from?', [['Cash (default)', 'Bank']]),
+          T('Ana', 'm2', 'Bank', { st: { account: 'Bank', step: 'confirm' } }),
+          E('m2', 'Expense in Flat 3B\n€36.90 Groceries\nPaid from Bank\nSplit equally: Ana €18.45, Ben €18.45\nMerchant: none', [['Add merchant'], ['Save', 'Cancel']]),
+          T('Ana', 'm2', 'Add merchant', { st: { step: 'merchant' } }),
+          E('m2', 'Send the Merchant name, or tap Skip.', [['Skip']]),
+          U('Ana', 'Lidl', { st: { merchant: 'Lidl', step: 'confirm' } }),
+          B('m3', 'Expense in Flat 3B\n€36.90 Groceries at Lidl\nPaid from Bank\nSplit equally: Ana €18.45, Ben €18.45', [['Save', 'Cancel']]),
+          T('Ana', 'm3', 'Save', { st: { step: 'saved' }, req: call('POST', 'Ana', uuid(4), exp({ account: '<Ana: Bank>', split: { rule: 'equal', members: ['<Ana>', '<Ben>'] } })) }),
+          E('m3', 'Saved: Expense in Flat 3B\n€36.90 Groceries at Lidl\nPaid by Ana from Bank\nSplit equally: Ana €18.45, Ben €18.45', ED),
+        ] },
+        transfer: { notes: ['The buttons show Account balances, so Ana sees what she has before she moves it.'], steps: [
+          U('Ana', 'Transfer', { menu: true, st: { flow: 'transfer', owner: 'Ana', draft_id: uuid(5), step: 'from' }, req: read('Ana', '/v1/me/accounts') }),
+          B('m1', 'Transfer from?', [['Cash €60.00', 'Bank €2,040.00']]),
+          T('Ana', 'm1', 'Bank €2,040.00', { st: { from: 'Bank', step: 'to' } }),
+          E('m1', 'From Bank. To?', [['Cash €60.00'], ['Back']]),
+          T('Ana', 'm1', 'Cash €60.00', { st: { to: 'Cash', step: 'amount' } }),
+          E('m1', 'From Bank to Cash. Send the amount.', null),
+          U('Ana', '200', { st: { amount: 20000, step: 'confirm' } }),
+          B('m2', 'Transfer €200.00 from Bank to Cash?', [['Save', 'Cancel']]),
+          T('Ana', 'm2', 'Save', { st: { step: 'saved' }, req: call('POST', 'Ana', uuid(5), transfer) }),
+          E('m2', REC_TRANSFER, ED),
+        ] },
+        income: { steps: [
+          U('Ana', 'Income', { menu: true, st: { flow: 'income', owner: 'Ana', draft_id: uuid(6), step: 'account' } }),
+          B('m1', 'Income into which Account?', [['Cash', 'Bank']]),
+          T('Ana', 'm1', 'Bank', { st: { account: 'Bank', step: 'amount' } }),
+          E('m1', 'Income into Bank. Send the amount.', null),
+          U('Ana', '2400', { st: { amount: 240000, step: 'confirm' } }),
+          B('m2', 'Income €2,400.00 into Bank?', [['Save', 'Cancel']]),
+          T('Ana', 'm2', 'Save', { st: { step: 'saved' }, req: call('POST', 'Ana', uuid(6), income) }),
+          E('m2', REC_INCOME, ED),
+        ] },
+        loan: { steps: [
+          U('Ana', 'Loan', { menu: true, st: { flow: 'loan', owner: 'Ana', draft_id: uuid(7), step: 'group' } }),
+          B('m1', 'Loan in which Group?', [['Flat 3B', 'Lisbon trip']]),
+          T('Ana', 'm1', 'Flat 3B', { st: { group: 'Flat 3B', step: 'borrower' } }),
+          E('m1', 'Loan in Flat 3B. Who gets the money?', [['Ben', 'Cara']]),
+          T('Ana', 'm1', 'Ben', { st: { borrower: 'Ben', step: 'amount' } }),
+          E('m1', 'Loan in Flat 3B to Ben. Send the amount.', null),
+          U('Ana', '50', { st: { amount: 5000, step: 'account' } }),
+          B('m2', 'Ana lends Ben €50.00. From?', [['Cash (default)', 'Bank']]),
+          T('Ana', 'm2', 'Bank', { st: { account: 'Bank', step: 'confirm' } }),
+          E('m2', 'Loan in Flat 3B\nAna lends Ben €50.00 from Bank\nIt goes to Ben\'s Default Account', [['Save', 'Cancel']]),
+          T('Ana', 'm2', 'Save', { st: { step: 'saved' }, req: call('POST', 'Ana', uuid(7), loan({})) }),
+          E('m2', REC_LOAN, ED),
+          N('Ben', N_LOAN_BEN),
+        ] },
+        settlement: { notes: ['The personal view lists balances from every Group, one line per Group.'], steps: [
+          U('Ana', 'Settle up', { menu: true, st: { flow: 'settlement', owner: 'Ana', draft_id: uuid(8), step: 'pick' }, req: read('Ana', '/v1/me/balances') }),
+          B('m1', 'Your balances:\nFlat 3B: you owe Cara €19.20 (shared)\nFlat 3B: Ben owes you €50.00 (loan)\nLisbon trip: you owe Ben €31.00 (shared)', [['Pay Cara €19.20, Flat 3B'], ['Pay Ben €31.00, Lisbon trip'], ['Other']]),
+          T('Ana', 'm1', 'Pay Cara €19.20, Flat 3B', { st: { group: 'Flat 3B', payee: 'Cara', balance: 'shared', amount: 1920, step: 'account' } }),
+          E('m1', 'Ana pays Cara €19.20 in Flat 3B, shared balance. From?', [['Cash (default)', 'Bank'], ['Change amount']]),
+          T('Ana', 'm1', 'Change amount', { st: { step: 'amount' } }),
+          E('m1', 'Ana pays Cara in Flat 3B, shared balance. Send the amount.', null),
+          U('Ana', '15', { st: { amount: 1500, step: 'account' } }),
+          B('m2', 'Ana pays Cara €15.00, shared balance. From?', [['Cash (default)', 'Bank']]),
+          T('Ana', 'm2', 'Cash (default)', { st: { account: 'Cash', step: 'confirm' } }),
+          E('m2', 'Settlement in Flat 3B\nAna pays Cara €15.00 from Cash, shared balance\nAfter this: Ana owes Cara €4.20', [['Save', 'Cancel']]),
+          T('Ana', 'm2', 'Save', { st: { step: 'saved' }, req: call('POST', 'Ana', uuid(8), settle({ amount: 1500, payer: '<Ana>', payee: '<Cara>', account: '<Ana: Cash>' })) }),
+          E('m2', REC_SETTLE_CARA, ED),
+          N('Cara', N_SETTLE_CARA),
+        ] },
+      },
+    },
+  },
+
+  C: {
+    name: 'One-line syntax',
+    how: [
+      'One grammar for every kind. The shape of the line decides the kind. The bot saves at once and the receipt has an Undo button.',
+      'Expense: <code>36.90 groceries lidl</code>, with optional <code>from bank</code>, <code>for ana ben</code>, <code>in lisbon</code>. Transfer: <code>200 bank &gt; cash</code>. Income: <code>+2400 bank</code>. Loan: <code>lent ben 50</code>. Settlement: <code>paid ana 23.40</code>, with optional <code>loan</code>.',
+      'The fewest actions: one message per Transaction.',
+      'In groups, plain text never reaches the bot while privacy mode is on. People must start with <code>/k</code>, or the bot must be a group admin, which lets it read every message.',
+      'Editing your own message re-records it. The bot gets <code>edited_message</code> and sends an edit with <code>If-Match</code>. The edit needs its own Idempotency-Key, because the same <code>tg:&lt;chat_id&gt;:&lt;message_id&gt;</code> with a new body returns <code>422 idempotency_key_reused</code>.',
+      'Silent defaults (last Group, shared balance, Default Account) can record the wrong thing, so the receipt states every default it used.',
+      'The parser must match Category names with spaces ("eating out"), Member names, and Account names, and tell them apart.',
+    ],
+    t: {
+      group: {
+        expense: { notes: ['Ana fixes a typo by editing her own message. The receipt updates to revision 2.'], steps: [
+          U('Ana', '36.90 groceries lidl', { hidden: true }),
+          S('The bot never sees this message. Privacy mode hides plain text in groups.'),
+          U('Ana', '/k 36.90 groceries lidl', { req: call('POST', 'Ana', tg(GCHAT, 612), exp({})) }),
+          B('r1', 'Saved: €36.90 Groceries at Lidl, Flat 3B\nAna paid from Cash (default)\nSplit equally: Ana €12.30, Ben €12.30, Cara €12.30', [['Undo']]),
+          UE('Ana', '/k 39.60 groceries lidl', { req: call('PATCH', 'Ana', `${tg(GCHAT, 612)}:edit:1`, exp({ amount: 3960 }), { path: '/v1/transactions/<id>', ifMatch: '"1"' }) }),
+          E('r1', 'Saved, revision 2: €39.60 Groceries at Lidl, Flat 3B\nAna paid from Cash (default)\nSplit equally: Ana €13.20, Ben €13.20, Cara €13.20', [['Undo']]),
+        ] },
+        transfer: { notes: ['The line is already in the group\'s history before the bot can refuse it.'], steps: [
+          U('Ana', '/k 200 bank > cash'),
+          B('r1', 'Transfers are private. Send it to me in our private chat.', OPEN_PRIVATE),
+          S('Ana\'s Account names and the amount are now in the group\'s history.'),
+        ] },
+        income: { steps: [
+          U('Ana', '/k +2400 bank'),
+          B('r1', 'Income is private. Send it to me in our private chat.', OPEN_PRIVATE),
+        ] },
+        loan: { steps: [
+          U('Ana', '/k lent ben 50 from bank', { req: call('POST', 'Ana', tg(GCHAT, 620), loan({})) }),
+          B('r1', 'Saved: Loan in Flat 3B\nAna lent Ben €50.00 from Bank\nLoan balance: Ben owes Ana €50.00', [['Undo']]),
+        ] },
+        settlement: { who: 'Ben', notes: ['Ben didn\'t say shared or loan, so the bot used shared and says so. Ben owes Ana on both, so this default could be wrong.'], steps: [
+          U('Ben', '/k paid ana 23.40', { req: call('POST', 'Ben', tg(GCHAT, 630), settle({})) }),
+          B('r1', 'Saved: Settlement in Flat 3B\nBen paid Ana €23.40 from Cash (default)\nShared balance, because you didn\'t say loan\nShared balance: Ben and Ana are settled', [['Undo']]),
+        ] },
+      },
+      private: {
+        expense: { notes: ['With no "in", the bot uses the Group Ana used last.', 'An unknown word fails, because the bot can\'t tell a new Category from a Merchant.'], steps: [
+          U('Ana', '36.90 groceries lidl', { req: call('POST', 'Ana', tg(PRIV, 51), exp({})) }),
+          B('r1', 'Saved: €36.90 Groceries at Lidl\nFlat 3B (the Group you used last)\nPaid from Cash (default)\nSplit equally: Ana €12.30, Ben €12.30, Cara €12.30', [['Undo']]),
+          U('Ana', '4.50 eating out from bank in lisbon', { req: call('POST', 'Ana', tg(PRIV, 53), exp({ group: '<Lisbon trip>', amount: 450, category: '<Eating out>', merchant: null, account: '<Ana: Bank>', split: { rule: 'equal', members: ['<Ana>', '<Ben>'] } })) }),
+          B('r2', 'Saved: €4.50 Eating out, Lisbon trip\nPaid from Bank\nSplit equally: Ana €2.25, Ben €2.25', [['Undo']]),
+          U('Ana', '12 lunch'),
+          B('r3', 'I don\'t know the Category "lunch". Your Categories: groceries, eating out, household, utilities, transport.'),
+        ] },
+        transfer: { steps: [
+          U('Ana', '200 bank > cash', { req: call('POST', 'Ana', tg(PRIV, 55), transfer) }),
+          B('r1', REC_TRANSFER, [['Undo']]),
+        ] },
+        income: { notes: ['The + is easy to forget. Without it, "2400 bank" reads as an Expense, and "bank" is not a Category, so it fails.'], steps: [
+          U('Ana', '+2400 bank', { req: call('POST', 'Ana', tg(PRIV, 56), income) }),
+          B('r1', REC_INCOME, [['Undo']]),
+        ] },
+        loan: { notes: ['Ana and Ben share two Groups, so the bot asks. With Cara it would pick Flat 3B, the only shared Group.'], steps: [
+          U('Ana', 'lent ben 50 from bank'),
+          B('r1', 'You share 2 Groups with Ben. Add "in flat" or "in lisbon".'),
+          U('Ana', 'lent ben 50 from bank in flat', { req: call('POST', 'Ana', tg(PRIV, 59), loan({})) }),
+          B('r2', REC_LOAN, [['Undo']]),
+          N('Ben', N_LOAN_BEN),
+        ] },
+        settlement: { notes: ['Ana and Cara have only a shared balance, so the default is safe here.'], steps: [
+          U('Ana', 'paid cara 15', { req: call('POST', 'Ana', tg(PRIV, 61), settle({ amount: 1500, payer: '<Ana>', payee: '<Cara>', account: '<Ana: Cash>' })) }),
+          B('r1', REC_SETTLE_CARA, [['Undo']]),
+          N('Cara', N_SETTLE_CARA),
+        ] },
+      },
+    },
+  },
+
+  D: {
+    name: 'Line, then card',
+    how: [
+      'Type what you know, in any order. The bot replies with one draft card that has buttons for anything missing or wrong. Nothing is saved until Save.',
+      'Uses the same words as C but forgives more: "200 bank cash" and "37 lidl" both work, because the card asks for what it couldn\'t tell.',
+      '2 to 5 actions in the common case. A typo becomes a button choice, not an error message.',
+      'Every Transaction needs a Save tap, one more action than C.',
+      'In groups the line still needs <code>/k</code>. Each Transaction leaves 2 messages in the chat: the line and the card, edited in place.',
+      'Needs a draft in Redis, like B, and an owner check on every button press in groups.',
+      'A Transfer or Income typed in a group can move to the private chat through a deep link that carries the draft id (64 characters at most), so the private chat opens on the same card.',
+    ],
+    t: {
+      group: {
+        expense: { notes: ['"lidl" isn\'t a Category, so the bot reads it as the Merchant and asks for the Category.', '"Paid by" lets Ana record for someone else. Whether she may is the question in "Who may record, edit, or delete a Transaction".'], steps: [
+          U('Ana', '/k 37 lidl', { st: { flow: 'expense', owner: 'Ana', draft_id: uuid(9), amount: 3700, merchant: 'Lidl', step: 'category' } }),
+          B('m1', 'Draft by Ana, not saved yet\nExpense in Flat 3B: €37.00 at Lidl\nCategory?', CATS),
+          T('Ana', 'm1', 'Groceries', { st: { category: 'Groceries', step: 'confirm' } }),
+          E('m1', 'Draft by Ana, not saved yet\n€37.00 Groceries at Lidl, Flat 3B\nPaid by Ana from Cash (default)\nSplit equally: €12.33 each, and 1 cent goes to one of you at random', [['Split: equal, 3', 'From: Cash'], ['Paid by: Ana'], ['Save', 'Cancel']]),
+          T('Ben', 'm1', 'Save'),
+          X('Ben', 'Only Ana can save this draft.'),
+          T('Ana', 'm1', 'Save', { st: { step: 'saved' }, req: call('POST', 'Ana', uuid(9), exp({ amount: 3700 })) }),
+          E('m1', 'Saved: Expense in Flat 3B\n€37.00 Groceries at Lidl\nPaid by Ana from Cash\nAna €12.33, Ben €12.34, Cara €12.33', ED),
+        ] },
+        transfer: { notes: ['The draft moves to the private chat. Ana only taps Save there.'], steps: [
+          U('Ana', '/k 200 bank cash', { st: { flow: 'transfer', owner: 'Ana', draft_id: uuid(0), amount: 20000, from: 'Bank', to: 'Cash', step: 'moved to private chat' } }),
+          B('m1', 'Transfers are private. Your draft is waiting in our private chat.', [['Open draft in private chat']]),
+          S('The button is a deep link with start parameter d_' + uuid(0).replace(/-/g, '') + '. That is 34 characters, under the 64 limit.'),
+        ] },
+        income: { steps: [
+          U('Ana', '/k +2400 bank'),
+          B('m1', 'Income is private. Your draft is waiting in our private chat.', [['Open draft in private chat']]),
+        ] },
+        loan: { steps: [
+          U('Ana', '/k lend ben 50', { st: { flow: 'loan', owner: 'Ana', draft_id: uuid(1), borrower: 'Ben', amount: 5000, account: 'Cash', step: 'confirm' } }),
+          B('m1', 'Draft by Ana, not saved yet\nLoan in Flat 3B: Ana lends Ben €50.00\nFrom Cash (default)', [['From: Cash'], ['Save', 'Cancel']]),
+          T('Ana', 'm1', 'From: Cash'),
+          E('m1', 'Draft by Ana, not saved yet\nLoan in Flat 3B: Ana lends Ben €50.00\nFrom?', [['Cash', 'Bank']]),
+          T('Ana', 'm1', 'Bank', { st: { account: 'Bank' } }),
+          E('m1', 'Draft by Ana, not saved yet\nLoan in Flat 3B: Ana lends Ben €50.00\nFrom Bank\nIt goes to Ben\'s Default Account', [['From: Bank'], ['Save', 'Cancel']]),
+          T('Ana', 'm1', 'Save', { st: { step: 'saved' }, req: call('POST', 'Ana', uuid(1), loan({})) }),
+          E('m1', REC_LOAN, ED),
+        ] },
+        settlement: { who: 'Ben', notes: ['Ben owes Ana on both balances, so the card asks which one and shows both amounts.'], steps: [
+          U('Ben', '/k paid ana 23.40', { st: { flow: 'settlement', owner: 'Ben', draft_id: uuid(2), payee: 'Ana', amount: 2340, step: 'balance' }, req: read('Ben', '/v1/groups/<Flat 3B>/balances') }),
+          B('m1', 'Draft by Ben, not saved yet\nSettlement in Flat 3B: Ben pays Ana €23.40\nWhich balance? You owe Ana €23.40 shared and €50.00 loan.', [['Shared', 'Loan']]),
+          T('Ben', 'm1', 'Shared', { st: { balance: 'shared', account: 'Cash', step: 'confirm' } }),
+          E('m1', 'Draft by Ben, not saved yet\nBen pays Ana €23.40 from Cash (default), shared balance\nAfter this: Ben and Ana are settled on shared', [['From: Cash'], ['Save', 'Cancel']]),
+          T('Ben', 'm1', 'Save', { st: { step: 'saved' }, req: call('POST', 'Ben', uuid(2), settle({})) }),
+          E('m1', REC_SETTLE_BEN, ED),
+        ] },
+      },
+      private: {
+        expense: { notes: ['Ana uses a decimal comma. The card shows the Group it guessed, and she can change it with a button.'], steps: [
+          U('Ana', '36,90 groceries lidl', { st: { flow: 'expense', owner: 'Ana', draft_id: uuid(3), amount: 3690, category: 'Groceries', merchant: 'Lidl', group: 'Flat 3B (last used)', step: 'confirm' } }),
+          B('m1', 'Draft, not saved yet\n€36.90 Groceries at Lidl\nGroup: Flat 3B (last used)\nPaid from Cash (default)\nSplit equally: Ana, Ben, Cara', [['Group: Flat 3B', 'Split: equal, 3'], ['From: Cash'], ['Save', 'Cancel']]),
+          T('Ana', 'm1', 'Split: equal, 3'),
+          E('m1', '€36.90 Groceries at Lidl, Flat 3B\nWho shares it? Tap to toggle.', [['[x] Ana', '[x] Ben', '[x] Cara'], ['Percentages', 'Exact amounts'], ['Done']]),
+          T('Ana', 'm1', '[x] Cara'),
+          E('m1', '€36.90 Groceries at Lidl, Flat 3B\nWho shares it? Tap to toggle.', [['[x] Ana', '[x] Ben', '[ ] Cara'], ['Percentages', 'Exact amounts'], ['Done']]),
+          T('Ana', 'm1', 'Done', { st: { split: { rule: 'equal', members: ['Ana', 'Ben'] } } }),
+          E('m1', 'Draft, not saved yet\n€36.90 Groceries at Lidl\nGroup: Flat 3B\nPaid from Cash (default)\nSplit equally: Ana €18.45, Ben €18.45', [['Group: Flat 3B', 'Split: Ana, Ben'], ['From: Cash'], ['Save', 'Cancel']]),
+          T('Ana', 'm1', 'Save', { st: { step: 'saved' }, req: call('POST', 'Ana', uuid(3), exp({ split: { rule: 'equal', members: ['<Ana>', '<Ben>'] } })) }),
+          E('m1', 'Saved: Expense in Flat 3B\n€36.90 Groceries at Lidl\nPaid by Ana from Cash\nSplit equally: Ana €18.45, Ben €18.45', ED),
+        ] },
+        transfer: { notes: ['No ">" needed. The card reads the first Account as the source and offers Swap.'], steps: [
+          U('Ana', '200 bank cash', { st: { flow: 'transfer', owner: 'Ana', draft_id: uuid(4), amount: 20000, from: 'Bank', to: 'Cash', step: 'confirm' } }),
+          B('m1', 'Draft, not saved yet\nTransfer €200.00 from Bank to Cash', [['Swap direction'], ['Save', 'Cancel']]),
+          T('Ana', 'm1', 'Save', { st: { step: 'saved' }, req: call('POST', 'Ana', uuid(4), transfer) }),
+          E('m1', REC_TRANSFER, ED),
+        ] },
+        income: { notes: ['No Category matches and "bank" is an Account, so the bot can\'t tell Income from a Transfer and asks.', 'The word "salary" has nowhere to go.'], steps: [
+          U('Ana', '2400 bank salary', { st: { flow: '?', owner: 'Ana', draft_id: uuid(5), amount: 240000, account: 'Bank', step: 'kind' } }),
+          B('m1', 'Draft, not saved yet\n€2,400.00 with Bank. What is it?', [['Income into Bank'], ['Expense from Bank', 'Transfer']]),
+          T('Ana', 'm1', 'Income into Bank', { st: { flow: 'income', step: 'confirm' } }),
+          E('m1', 'Draft, not saved yet\nIncome €2,400.00 into Bank', [['Save', 'Cancel']]),
+          T('Ana', 'm1', 'Save', { st: { step: 'saved' }, req: call('POST', 'Ana', uuid(5), income) }),
+          E('m1', REC_INCOME, ED),
+        ] },
+        loan: { steps: [
+          U('Ana', 'lend ben 50', { st: { flow: 'loan', owner: 'Ana', draft_id: uuid(6), borrower: 'Ben', amount: 5000, step: 'group' } }),
+          B('m1', 'Draft, not saved yet\nAna lends Ben €50.00\nWhich Group? You share 2 with Ben.', [['Flat 3B', 'Lisbon trip']]),
+          T('Ana', 'm1', 'Flat 3B', { st: { group: 'Flat 3B', account: 'Cash', step: 'confirm' } }),
+          E('m1', 'Draft, not saved yet\nLoan in Flat 3B: Ana lends Ben €50.00\nFrom Cash (default)', [['From: Cash'], ['Save', 'Cancel']]),
+          T('Ana', 'm1', 'Save', { st: { step: 'saved' }, req: call('POST', 'Ana', uuid(6), loan({ account: '<Ana: Cash>' })) }),
+          E('m1', 'Saved: Loan in Flat 3B\nAna lent Ben €50.00 from Cash\nIt went to Ben\'s Default Account\nLoan balance: Ben owes Ana €50.00', ED),
+          N('Ben', N_LOAN_BEN.replace('Bank', 'Cash')),
+        ] },
+        settlement: { notes: ['Ana and Cara share one Group and one kind of balance, so the card fills everything in.'], steps: [
+          U('Ana', 'paid cara 15', { st: { flow: 'settlement', owner: 'Ana', draft_id: uuid(7), payee: 'Cara', amount: 1500, group: 'Flat 3B', balance: 'shared', account: 'Cash', step: 'confirm' }, req: read('Ana', '/v1/me/balances') }),
+          B('m1', 'Draft, not saved yet\nSettlement in Flat 3B, shared balance (the only balance between you and Cara)\nAna pays Cara €15.00 from Cash (default)\nAfter this: Ana owes Cara €4.20', [['From: Cash'], ['Save', 'Cancel']]),
+          T('Ana', 'm1', 'Save', { st: { step: 'saved' }, req: call('POST', 'Ana', uuid(7), settle({ amount: 1500, payer: '<Ana>', payee: '<Cara>', account: '<Ana: Cash>' })) }),
+          E('m1', REC_SETTLE_CARA, ED),
+          N('Cara', N_SETTLE_CARA),
+        ] },
+      },
+    },
+  },
+};
+
+const QUESTIONS = [
+  'Which variant, or which mix? For example, C for people who know the syntax and D for everyone else, both reading the same line.',
+  'Does a Transaction get a free-text note, such as "salary" or "pizza night"? The glossary has no field for one.',
+  'Is there a personal Group ("Just me") for Expenses nobody shares? Is it created at sign-up?',
+  'In a private chat, which Group does an Expense go to when the User doesn\'t say: the last used, a chosen default, or always ask?',
+  'Which Account pays by default: the Default Account, or the last Account used in that Group?',
+  'Does the bot run with privacy mode on (commands and replies only) or as a group admin that reads every message? Admin lets plain lines work in groups, but the bot then reads all chat text, which the privacy notice must cover.',
+  'Transfer and Income typed in a group chat: refuse with a link to the private chat, or record them and reply privately?',
+  'How does a User name a Group or Member in text: display names, short handles, or Telegram @usernames? Two Members called Ben break name matching.',
+  'Do other Members get a Notification for an Expense they didn\'t see, such as one recorded in a private chat? (Belongs to "Endpoints and Notification types in the Channel API".)',
+  'May Ana record an Expense Ben paid, or a Settlement between two other Members? (Belongs to "Who may record, edit, or delete a Transaction".)',
+  'Should a draft preview show the exact Shares? It would need a backend dry-run call, because the backend picks who gets a leftover cent.',
+  'Accept a decimal comma ("36,90")? Accept thousands separators ("2.400")?',
+  'Undo on the receipt: how long does it stay? Undo is a delete, which adds cancelling Postings.',
+];
+
+// ---------- state ----------
+const KINDS = ['expense', 'transfer', 'income', 'loan', 'settlement'];
+const KIND_LABEL = { expense: 'Expense', transfer: 'Transfer', income: 'Income', loan: 'Loan', settlement: 'Settlement' };
+const CHATS = { private: 'Private chat', group: 'Group chat' };
+const VIEWS = { steps: 'Every step', final: 'Chat as it ends' };
+const VKEYS = Object.keys(VARIANTS);
+const qp = new URLSearchParams(location.search);
+let st = {
+  variant: VKEYS.includes(qp.get('variant')) ? qp.get('variant') : 'A',
+  chat: CHATS[qp.get('chat')] ? qp.get('chat') : 'group',
+  kind: KINDS.includes(qp.get('kind')) ? qp.get('kind') : 'expense',
+  view: VIEWS[qp.get('view')] ? qp.get('view') : 'steps',
+  sel: null,
+};
+
+function setParam() {
+  const p = new URLSearchParams({ variant: st.variant, chat: st.chat, kind: st.kind, view: st.view });
+  history.replaceState(null, '', '?' + p.toString());
+}
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function metrics(tr) {
+  const m = { actions: 0, typed: 0, messages: 0, edits: 0, writes: 0 };
+  for (const s of tr.steps) {
+    if (s.ty === 'u') { m.actions++; m.messages++; if (!s.menu) m.typed += s.t.length; }
+    if (s.ty === 'uedit') { m.actions++; m.typed += s.t.length; }
+    if (s.ty === 'tap') m.actions++;
+    if (s.ty === 'b') m.messages++;
+    if (s.ty === 'e') m.edits++;
+    if (s.req && s.req.method !== 'GET') m.writes++;
+  }
+  return m;
+}
+
+function kbHtml(kb, reply) {
+  if (!kb) return '';
+  return `<div class="kb${reply ? ' reply' : ''}">` + kb.map((r) => `<div class="kr">${r.map((k) => `<div class="k">${esc(k)}</div>`).join('')}</div>`).join('') + '</div>';
+}
+
+function firstLine(t) { return t.split('\n')[0]; }
+
+function render() {
+  setParam();
+  const v = VARIANTS[st.variant];
+  const tr = v.t[st.chat][st.kind];
+  const steps = tr.steps;
+  if (st.sel === null || st.sel >= steps.length) st.sel = steps.length - 1;
+
+  // segments
+  const seg = (el, opts, cur, key) => {
+    el.innerHTML = Object.entries(opts).map(([k, l]) => `<button class="${k === cur ? 'on' : ''}" data-k="${k}">${l}</button>`).join('');
+    el.querySelectorAll('button').forEach((b) => b.onclick = () => { st[key] = b.dataset.k; st.sel = null; render(); });
+  };
+  seg(document.getElementById('chatSeg'), CHATS, st.chat, 'chat');
+  seg(document.getElementById('kindSeg'), KIND_LABEL, st.kind, 'kind');
+  seg(document.getElementById('viewSeg'), VIEWS, st.view, 'view');
+
+  document.getElementById('chatTitle').textContent = st.chat === 'group' ? 'Flat 3B' : 'Kitty';
+  document.getElementById('chatSub').textContent = st.chat === 'group' ? 'Telegram group: Ana, Ben, Cara, and Kitty bot. Privacy mode on.' : 'Ana\'s private chat with Kitty bot';
+
+  // chat
+  const chat = document.getElementById('chat');
+  const me = tr.who || 'Ana';
+  const textOf = {};
+  const html = [];
+  const finalText = {}; const finalKb = {};
+  const editedIds = new Set();
+  steps.forEach((s) => { if (s.ty === 'b') { finalText[s.id] = s.t; finalKb[s.id] = s.kb; } if (s.ty === 'e') { finalText[s.id] = s.t; finalKb[s.id] = s.kb; editedIds.add(s.id); } });
+
+  steps.forEach((s, i) => {
+    const later = st.view === 'steps' && i > st.sel ? ' later' : '';
+    const selc = st.view === 'steps' && i === st.sel ? ' sel' : '';
+    const attrs = `data-i="${i}"`;
+    if (s.ty === 'b') textOf[s.id] = s.t;
+    if (s.ty === 'u') {
+      const side = s.w === me ? 'me' : 'other';
+      const quote = s.re ? `<div class="quote">Reply to Kitty: ${esc(firstLine(textOf[s.re] || ''))}</div>` : '';
+      const who = st.chat === 'group' && s.w !== me ? `<div class="who">${s.w}</div>` : '';
+      const tag = s.menu ? '<div class="tag">sent by tapping the keyboard menu</div>' : (s.hidden ? '<div class="tag">invisible to the bot</div>' : '');
+      html.push(`<div class="row ${side}${later}${selc}" ${attrs}><div class="bubble${s.hidden ? ' hidden' : ''}">${who}${quote}${esc(s.t)}${tag}</div></div>`);
+    } else if (s.ty === 'uedit') {
+      if (st.view === 'steps') html.push(`<div class="row center${later}${selc}" ${attrs}><div class="ann">${s.w} edits the message above to: <b>${esc(s.t)}</b></div></div>`);
+    } else if (s.ty === 'b') {
+      const t = st.view === 'final' ? finalText[s.id] : s.t;
+      const kb = st.view === 'final' ? finalKb[s.id] : s.kb;
+      const fr = s.fr ? `<div class="tag">asks ${s.fr} to reply</div>` : '';
+      const ed = st.view === 'final' && editedIds.has(s.id) ? '<div class="edited">edited</div>' : '';
+      html.push(`<div class="row other${later}${selc}" ${attrs}><div class="bubble"><div class="who bot">Kitty</div>${esc(t)}${fr}${ed}</div>${kbHtml(kb)}</div>`);
+    } else if (st.view === 'final') {
+      // edits are already applied, taps and notes are not part of the chat
+    } else if (s.ty === 'e') {
+      html.push(`<div class="row other${later}${selc}" ${attrs}><div class="bubble"><div class="who bot">Kitty</div>${esc(s.t)}<div class="tag">edits "${esc(firstLine(textOf[s.id] || ''))}" in place</div></div>${kbHtml(s.kb)}</div>`);
+      textOf[s.id] = s.t;
+    } else if (s.ty === 'tap') {
+      html.push(`<div class="row center${later}${selc}" ${attrs}><div class="ann">${s.w} taps <span class="chip">${esc(s.btn)}</span></div></div>`);
+    } else if (s.ty === 'toast') {
+      html.push(`<div class="row center${later}${selc}" ${attrs}><div class="ann toast">Popup only ${s.w} sees: ${esc(s.t)}</div></div>`);
+    } else if (s.ty === 'notif') {
+      html.push(`<div class="row center${later}${selc}" ${attrs}><div class="ann notif">Notification in ${s.w}'s private chat. ${esc(s.t.replace(/^To \w+: /, ''))}</div></div>`);
+    } else if (s.ty === 'sys') {
+      html.push(`<div class="row center${later}${selc}" ${attrs}><div class="ann sys">${esc(s.t)}</div></div>`);
+    }
+  });
+  if (st.chat === 'private' && st.variant === 'B') html.push(`<div class="row other">${kbHtml([['Expense', 'Transfer', 'Income'], ['Loan', 'Settle up']], true)}<div class="muted">Keyboard menu under the text field</div></div>`);
+  chat.innerHTML = html.join('');
+  chat.querySelectorAll('.row[data-i]').forEach((r) => r.onclick = () => { st.sel = +r.dataset.i; if (st.view === 'final') st.view = 'steps'; render(); });
+
+  // panel: variant
+  document.getElementById('vTitle').textContent = `Variant ${st.variant}: ${v.name}`;
+  document.getElementById('vNotes').innerHTML = v.how.map((h) => `<li>${h}</li>`).join('');
+  document.getElementById('tNotes').innerHTML = (tr.notes && tr.notes.length ? tr.notes : ['Nothing special. This is the plain case.']).map((n) => `<li>${esc(n)}</li>`).join('');
+
+  // compare
+  const rows = VKEYS.map((k) => { const m = metrics(VARIANTS[k].t[st.chat][st.kind]); return `<tr class="${k === st.variant ? 'cur' : ''}"><td>${k} ${VARIANTS[k].name}</td><td>${m.actions}</td><td>${m.typed}</td><td>${m.messages}</td><td>${m.edits}</td><td>${m.writes}</td></tr>`; });
+  document.getElementById('cmp').innerHTML = `<tr><th>Variant</th><th>Actions</th><th>Characters typed</th><th>Chat messages</th><th>Bot edits</th><th>Backend writes</th></tr>` + rows.join('');
+
+  // state at selected step
+  const draft = {}; const reqs = [];
+  steps.slice(0, st.sel + 1).forEach((s) => { if (s.st) Object.assign(draft, s.st); if (s.req) reqs.push(s.req); });
+  document.getElementById('stepLbl').textContent = `Step ${st.sel + 1} of ${steps.length}. Click a message or annotation in the chat to move.`;
+  document.getElementById('draft').textContent = Object.keys(draft).length ? JSON.stringify(draft, null, 2) : 'No draft. This variant keeps no conversation state.';
+  document.getElementById('reqs').textContent = reqs.length ? reqs.map((r) => `${r.method} ${r.path}\n${Object.entries(r.headers).map(([h, x]) => `${h}: ${x}`).join('\n')}${r.body ? '\n' + JSON.stringify(r.body, null, 2) : ''}`).join('\n\n') : 'None yet.';
+
+  // switcher
+  document.getElementById('vLabel').textContent = `${st.variant} (${v.name})`;
+}
+
+document.getElementById('questions').innerHTML = QUESTIONS.map((q) => `<li>${esc(q)}</li>`).join('');
+const cycle = (d) => { const i = VKEYS.indexOf(st.variant); st.variant = VKEYS[(i + d + VKEYS.length) % VKEYS.length]; st.sel = null; render(); };
+document.getElementById('prev').onclick = () => cycle(-1);
+document.getElementById('next').onclick = () => cycle(1);
+document.addEventListener('keydown', (e) => {
+  const t = e.target;
+  if (t.matches && t.matches('input, textarea, [contenteditable], [contenteditable] *')) return;
+  if (e.key === 'ArrowLeft') cycle(-1);
+  if (e.key === 'ArrowRight') cycle(1);
+  if (e.key === 'ArrowDown') { const n = VARIANTS[st.variant].t[st.chat][st.kind].steps.length; st.view = 'steps'; st.sel = Math.min(n - 1, st.sel + 1); render(); e.preventDefault(); }
+  if (e.key === 'ArrowUp') { st.view = 'steps'; st.sel = Math.max(0, st.sel - 1); render(); e.preventDefault(); }
+});
+render();
+</script>
+</body>
+</html>
