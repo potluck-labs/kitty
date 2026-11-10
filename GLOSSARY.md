@@ -112,6 +112,10 @@ _Avoid_: Portion, cut
 The label that says what an Expense was for, such as groceries or utilities.
 _Avoid_: Type, tag
 
+**Category total**:
+The sum of Shares in one Category over a period, for one User or for one Group. It counts what the spending cost each Member, not what the Payer paid.
+_Avoid_: Category spend, category sum
+
 **Merchant**:
 The store or business an Expense was paid to.
 _Avoid_: Shop, vendor, store name
