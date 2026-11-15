@@ -76,6 +76,10 @@ _Avoid_: Payback, reimbursement, repayment
 One signed amount on one Ledger account. A Transaction has two or more Postings, and each User's Postings on it sum to zero.
 _Avoid_: Entry, row, line
 
+**Party**:
+A Member with a Posting on a Transaction, such as the Payer or a Member with a Share. The Member who recorded a Transaction is not a Party unless they have a Posting on it.
+_Avoid_: Participant, involved Member
+
 **Ledger account**:
 Anything Postings add up to, such as a User's Account, a User's Category total, or what one Member owes another.
 _Avoid_: Account, bucket
