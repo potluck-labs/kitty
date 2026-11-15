@@ -2,6 +2,8 @@
 
 Kitty's specs will grow with its features, and we want each service's specs readable alone and agent context small. So the code lives in one repo per service, `kitty-backend` and `kitty-telegram-bot`, and any later Channel gets its own repo. The `kitty` repo holds anything about the business or affecting more than one repo. Each service repo keeps its own copy of the glossary terms and ADRs it uses, with definitions word for word, and agents working in it never read another repo. Shared changes merge in `kitty` first and then reach each affected service through a ticket that carries the full requirement. This costs two or more PRs for a contract change, duplicated CI and deploy config, and copies that can drift, which we check by a PR template checklist and not by automation. In return, a service's repo is enough to work in.
 
+Amended by [Deployment architecture](https://github.com/potluck-labs/kitty/issues/15): a fourth repo, `kitty-ops`, holds the server setup that both services share, because that is code and `kitty` stays docs only. `kitty` is private. The service repos and `kitty-ops` stay public, so they keep branch protection, environments, and free public images on GitHub's free plan. Reviews on `kitty` are a habit, not a rule GitHub enforces.
+
 ## Considered Options
 
 - A monorepo with one folder per service. It makes a contract change one PR, but all specs and docs sit in one tree.
