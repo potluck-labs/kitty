@@ -20,6 +20,10 @@ _Avoid_: Telegram user, login, handle
 A set of one or more people who record shared Transactions together. A Group with one person is a personal ledger.
 _Avoid_: Team, household, room
 
+**Personal Group**:
+The Group every User gets at sign-up, with only them as a Member, for money no one else shares.
+_Avoid_: Private group, solo group, my group
+
 **Member**:
 A User's place in one Group.
 _Avoid_: Participant, groupmate
@@ -43,7 +47,7 @@ A place that holds one User's money, such as cash or a bank account, with an ope
 _Avoid_: Wallet, source, bank
 
 **Default Account**:
-The one Account of a User that receives Loans and Settlements paid to them. Every User always has one.
+The one Account of a User that pays when they name no other Account, and that receives Loans and Settlements paid to them. Every User always has one.
 _Avoid_: Main account, primary account
 
 ## Transactions
@@ -79,6 +83,10 @@ _Avoid_: Entry, row, line
 **Party**:
 A Member with a Posting on a Transaction, such as the Payer or a Member with a Share. The Member who recorded a Transaction is not a Party unless they have a Posting on it.
 _Avoid_: Participant, involved Member
+
+**Note**:
+Optional free text a User adds to a Transaction, such as "salary".
+_Avoid_: Comment, description, memo
 
 **Ledger account**:
 Anything Postings add up to, such as a User's Account, a User's Category total, or what one Member owes another.
