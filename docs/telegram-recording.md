@@ -11,6 +11,7 @@ Decided in [How recording an Expense feels in Telegram](https://github.com/potlu
 - The bot saves at once and replies with a receipt.
 - A command it can't read gets a usage reply, and the User sends the command again.
 - The bot keeps no draft. The `Idempotency-Key` is `tg:<chat_id>:<message_id>`.
+- In groups, usage replies and help text name the bot, as in `/expense@kitty_bot 36.90 groceries at:lidl from:bank`. With privacy mode on, a plain `/expense` reaches the bot only if it was the last bot to post in the group (ADR 0008).
 
 The exact grammar and its defaults are decided in [Command grammar and defaults for recording in the MVP](https://github.com/potluck-labs/kitty/issues/26).
 
@@ -43,7 +44,7 @@ These rules keep the switch to "line, then card" a change inside `kitty-telegram
 
 - In the bot: the card renderer, button handlers, drafts in Redis with a time limit, and a check on every button press that the presser owns the draft.
 - In the bot: a deep link that carries a draft id, so a Transfer or Income typed in a group can open as a card in the private chat. The id must fit the 64-character start parameter.
-- In groups: plain lines reach the bot only with a command prefix such as `/k`, or when the bot is a group admin. [Privacy mode or group admin for the bot](https://github.com/potluck-labs/kitty/issues/25) decides which.
+- In groups: plain lines reach the bot only with a command prefix such as `/k 37 lidl`, or in a group that has made the bot an admin. Privacy mode stays on in BotFather (ADR 0008), so neither route needs the bot re-added. The switch picks the prefix alone, or the prefix with admin as an opt-in per group. With admin, normal chat that mentions money, such as "pizza was 36 lol", can open a card nobody asked for. Before relying on admin, test with the test bot whether a group that removes the bot as admin stops sending plain lines right away. The Telegram docs don't say.
 - In the backend, optional and additive within `/v1`: a dry-run call that returns the exact Shares. A preview can't show them otherwise, because the backend picks at random who gets a leftover cent.
 
 ## Not part of the switch
