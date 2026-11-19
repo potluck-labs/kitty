@@ -3,7 +3,7 @@
 An Expense that Ana paid and Ben shared is personal data of both, and Ben's balances and the Group's statistics depend on it. So Erasure removes what belongs to the User alone, and hands what other Members depend on to a placeholder Member in each Group that still has another User. The rule: nothing shared that affects another Member's balance or Share is deleted. It stays as it is or moves to the placeholder.
 
 - Removed: the User, their Channel identities, Accounts with names and opening balances, Transfers, Income, pending Notifications, the accepted notice record, and every Group with no other User left, including personal ledgers.
-- Moved to the placeholder: the Member row, the User's own Postings on shared Transactions, and every "recorded by" and revision-author reference. The Payer Posting loses its Account.
+- Moved to the placeholder: the Member row, the User's own Postings on shared Transactions, and every "recorded by" and revision-author reference. Payer Postings move to the placeholder's Untracked money (ADR 0012).
 - Kept unchanged: other Members' Postings, and the amounts, dates, Categories, and Merchants of shared Transactions.
 
 The placeholder is an ordinary placeholder Member with no special kind, so edits, Group statistics, and claiming work the same as for any placeholder. It is named "Former member N" unless the User chooses at Erasure to keep their name. The remaining Members get a Notification that suggests a rename, with no name filled in, and may rename it. Kitty keeps no link to the erased person. A returning person signs up as a new User and claims placeholders when Group Members invite them.
