@@ -21,7 +21,7 @@ A set of one or more people who record shared Transactions together. A Group wit
 _Avoid_: Team, household, room
 
 **Personal Group**:
-The Group every User gets at sign-up, with only them as a Member, for money no one else shares.
+The Group every User gets at sign-up, with only them as a Member, for money no one else shares. No one else can ever join it, and it is never linked to a Channel chat.
 _Avoid_: Private group, solo group, my group
 
 **Member**:
@@ -33,7 +33,7 @@ A code Kitty issues so a User can join a Group. A Channel may show it as a link,
 _Avoid_: Invite link, Telegram link
 
 **Channel chat**:
-A conversation in a Channel that is linked to one Group, such as a Telegram group chat. Being in the chat does not make someone a Member.
+A conversation in a Channel that is linked to one Group, such as a Telegram group chat. A Group has at most one Channel chat in each Channel. Being in the chat does not make someone a Member.
 _Avoid_: Group chat, room
 
 **Notification**:
@@ -47,7 +47,7 @@ A place that holds one User's money, such as cash or a bank account, with an ope
 _Avoid_: Wallet, source, bank
 
 **Default Account**:
-The Account Kitty picks first when a User records a Transaction themselves. Every User always has one, and it is never Untracked money.
+The Account Kitty picks first when a User records a Transaction themselves. A User has one from their first Account on, and it is never Untracked money.
 _Avoid_: Main account, primary account
 
 ## Transactions
