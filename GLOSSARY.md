@@ -47,7 +47,7 @@ A place that holds one User's money, such as cash or a bank account, with an ope
 _Avoid_: Wallet, source, bank
 
 **Default Account**:
-The one Account of a User that pays when they name no other Account, and that receives Loans and Settlements paid to them. Every User always has one.
+The Account Kitty picks first when a User records a Transaction themselves. Every User always has one, and it is never Untracked money.
 _Avoid_: Main account, primary account
 
 ## Transactions
