@@ -59,7 +59,7 @@ Fixed arguments come first, in order. Options follow in any order. An option's v
 
 ### Defaults
 
-- **Account**: the Payer's Default Account pays, and Income goes into the sender's Default Account, unless the command names another.
+- **Account**: the sender's own side, paying or receiving, uses their Default Account unless `from:` names another. Income goes into the sender's Default Account unless the command names another. Another Member's side, such as a Payer named with `by:` or the receiver of a Loan or Settlement, goes to that Member's Untracked money. That Member moves it to one of their Accounts by an edit (ADR 0012).
 - **Group in a group chat**: always the Group linked to the chat. An `in:` naming another Group is a problem that points to the private chat. A chat with no linked Group gets a reply asking someone to link it.
 - **Group in a private chat**: `in:` wins. Without it, the Group is the one of the sender's Groups that holds every Member the command names (`split:`, `by:`, the borrower, or the payee). If no other Member is named, it is the sender's Personal Group. Zero or two or more matching Groups is a problem that lists the candidates.
 - **Settlement balance**: without `shared` or `loan`, the bot reads the balances between the two Members. If only one of them is non-zero, it uses that one. If both are zero, it uses shared. If both are non-zero, it is a problem. The receipt always says which balance it used.
@@ -67,7 +67,7 @@ Fixed arguments come first, in order. Options follow in any order. An option's v
 ### Chat rules
 
 - `/transfer` and `/income` in a group chat record nothing. The bot replies with an "Open private chat" button.
-- A receipt in a group chat leaves out the Account, because other Members never see a Member's Accounts. The Payer gets a private line, "Paid from your Cash (default)". A receipt in the private chat names the Account.
+- A receipt in a group chat leaves out the Account, because other Members never see a Member's Accounts. When the sender is the Payer, they get a private line, "Paid from your Cash (default)". When another Member's money moved, that Member gets a Notification that it went to their Untracked money, and it lets them pick an Account. A receipt in the private chat names the Account.
 - Command menus differ by chat type. In private chats: `/expense /transfer /income /loan /settle /balance /stats /help /privacy /export /erase`. In group chats: `/expense /loan /settle /balance /stats /help`.
 
 ### Edit and Delete
@@ -89,7 +89,7 @@ Ana is in three Groups: Personal, Flat 3B (with Ben and Cara), and Lisbon trip (
 | `/expense 36,90 groceries at:lidl` | The same Expense. A decimal comma works, and so does a plain `/expense` when the bot reaches it. |
 | `/expense 36.90 groceries at:lidl from:bank` | The same Expense, paid from Bank. The group receipt leaves out the Account, and Ana gets "Paid from your Bank" privately. |
 | `/expense 36.90 eat at:Pizza Hut` | "eat" is a prefix that matches only Eating out. The Merchant "Pizza Hut" has a space, which works because a value runs until the next `key:`. |
-| `/expense 36.90 groceries by:@ben` | Ana records that Ben paid. The Account is Ben's Default Account, and only Ben may change it. |
+| `/expense 36.90 groceries by:@ben` | Ana records that Ben paid. The money comes from Ben's Untracked money. Ben gets a Notification and moves it to one of his Accounts by an edit. Only Ben picks his Account. |
 | `/expense 8 groceries split:@ben,@cara` | Ana paid €8. Ben and Cara each have a €4 Share, and Ana has none. |
 | `/expense 36.90 groceries split:@ana=20,@ben=16.90` | Exact amounts: Ana has €20 and Ben has €16.90. |
 | `/expense 50 utilities split:@ana=60%,@ben=40%` | Percentages: Ana has €30 and Ben has €20. |
@@ -120,9 +120,9 @@ In a group chat, `/transfer` and `/income` record nothing. The bot replies with 
 
 | Command | What it records |
 |---|---|
-| `/loan 50 @ben` | In the Flat 3B group chat: Ana lent Ben €50 from Cash. The money goes to Ben's Default Account. |
+| `/loan 50 @ben` | In the Flat 3B group chat: Ana lent Ben €50 from Cash. The money goes to Ben's Untracked money until he picks an Account. |
 | `/loan 50 @ben from:bank` | The same Loan, from Bank. |
-| `/loan 50 me by:@ana` | Sent by Ben: Ana lent Ben €50 from Ana's Default Account. |
+| `/loan 50 me by:@ana` | Sent by Ben: Ana lent Ben €50. The money comes from Ana's Untracked money and goes to Ben's Default Account. |
 | `/loan 50 @cara` | In Ana's private chat: the Loan goes to Flat 3B, the only Group Ana shares with Cara. |
 | `/loan 50 @ben in:lisbon` | In Ana's private chat: the Loan goes to Lisbon trip. Without `in:`, it is a problem, because Ana shares two Groups with Ben. |
 
@@ -130,11 +130,11 @@ In a group chat, `/transfer` and `/income` record nothing. The bot replies with 
 
 | Command | What it records |
 |---|---|
-| `/settle 23.40 @ana shared` | Sent by Ben: Ben paid Ana €23.40 from his Default Account, against the Shared balance. |
+| `/settle 23.40 @ana shared` | Sent by Ben: Ben paid Ana €23.40 from his Default Account, against the Shared balance. The money goes to Ana's Untracked money. |
 | `/settle 23.40 @ana` | The same, if only one balance between them is non-zero. If Ben owes Ana on both, the bot sends a problem asking for `shared` or `loan`. |
-| `/settle 50 @ana loan from:bank` | Sent by Ben: Ben paid Ana €50 from Bank, against the Loan balance. |
-| `/settle 23.40 me shared by:@ben` | Sent by Ana: Ana records that Ben paid her. |
-| `/settle 15 @cara shared in:flat3b` | In Ana's private chat: Ana paid Cara €15 in Flat 3B. |
+| `/settle 50 @ana loan from:bank` | Sent by Ben: Ben paid Ana €50 from Bank, against the Loan balance. The money goes to Ana's Untracked money. |
+| `/settle 23.40 me shared by:@ben` | Sent by Ana: Ana records that Ben paid her. The money comes from Ben's Untracked money and goes to Ana's Default Account. |
+| `/settle 15 @cara shared in:flat3b` | In Ana's private chat: Ana paid Cara €15 in Flat 3B. The money goes to Cara's Untracked money. |
 
 **Usage replies**
 
