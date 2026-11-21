@@ -43,7 +43,7 @@ Fixed arguments come first, in order. Options follow in any order. An option's v
 
 ### Names
 
-- A Category, Account, or Group is named by its name, matched ignoring case, accents, spaces, and punctuation. So `eatingout`, `eating-out`, and `Eating_Out` all match "Eating out". A name with spaces is typed without them or with `-`, because a space ends an argument.
+- A Category, Account, or Group is named by its name, matched on its letters and digits only, in any script, ignoring case and accents. So `eatingout`, `eating-out`, and `Eating_Out` all match "Eating out". A name with spaces is typed without them or with `-`, because a space ends an argument.
 - An exact match wins. Otherwise a prefix that matches exactly one item wins, so `eat` works.
 - A Member is named by their Telegram @username, by a tap-to-mention for people with no username, or by their name, matched the same way. `me` is the sender. The Member must be in the Group the command goes to.
 - Zero matches, or two or more, is a problem. The usage reply lists the candidates.
@@ -59,7 +59,7 @@ Fixed arguments come first, in order. Options follow in any order. An option's v
 
 ### Defaults
 
-- **Account**: the sender's own side, paying or receiving, uses their Default Account unless `from:` names another. Income goes into the sender's Default Account unless the command names another. Another Member's side, such as a Payer named with `by:` or the receiver of a Loan or Settlement, goes to that Member's Untracked money. That Member moves it to one of their Accounts by an edit (ADR 0012).
+- **Account**: the sender's own side, paying or receiving, uses their Default Account unless `from:` names another. Income goes into the sender's Default Account unless the command names another. A User with no Account yet has no Default Account. Their own side then uses their Untracked money, and Income gets a problem that asks them to make an Account first. Another Member's side, such as a Payer named with `by:` or the receiver of a Loan or Settlement, goes to that Member's Untracked money. That Member moves it to one of their Accounts by an edit (ADR 0012).
 - **Group in a group chat**: always the Group linked to the chat. An `in:` naming another Group is a problem that points to the private chat. A chat with no linked Group gets a reply asking someone to link it.
 - **Group in a private chat**: `in:` wins. Without it, the Group is the one of the sender's Groups that holds every Member the command names (`split:`, `by:`, the borrower, or the payee). If no other Member is named, it is the sender's Personal Group. Zero or two or more matching Groups is a problem that lists the candidates.
 - **Settlement balance**: without `shared` or `loan`, the bot reads the balances between the two Members. If only one of them is non-zero, it uses that one. If both are zero, it uses shared. If both are non-zero, it is a problem. The receipt always says which balance it used.
@@ -68,7 +68,7 @@ Fixed arguments come first, in order. Options follow in any order. An option's v
 
 - `/transfer` and `/income` in a group chat record nothing. The bot replies with an "Open private chat" button.
 - A receipt in a group chat leaves out the Account, because other Members never see a Member's Accounts. When the sender is the Payer, they get a private line, "Paid from your Cash (default)". When another Member's money moved, that Member gets a Notification that it went to their Untracked money, and it lets them pick an Account. A receipt in the private chat names the Account.
-- Command menus differ by chat type. In private chats: `/expense /transfer /income /loan /settle /balance /stats /help /privacy /export /erase`. In group chats: `/expense /loan /settle /balance /stats /help`.
+- Command menus differ by chat type. In private chats: `/expense /transfer /income /loan /settle /balance /stats /group /member /account /help /privacy /export /erase`. In group chats: `/expense /loan /settle /balance /stats /group /member /help`.
 
 ### Edit and Delete
 
@@ -153,6 +153,201 @@ In a group chat, `/transfer` and `/income` record nothing. The bot replies with 
 2. The bot replies with `` `/expense 36.90 groceries at:lidl` `` for her to copy.
 3. Ana replies to that message with `/expense 39.60 groceries at:lidl`.
 4. The bot saves revision 2 and edits the receipt to show €39.60.
+
+## Managing Groups, Members, and Accounts
+
+Decided in [How Members manage Groups and Accounts](https://github.com/potluck-labs/kitty/issues/37). These commands follow the grammar above: fixed arguments, then `key:value` options, and names matched as in "Names".
+
+### Commands
+
+Three commands each take an action word. A command with no action word shows a list.
+
+| Command | What it does | Where |
+|---|---|---|
+| `/group` | Shows the Group, its Members, and its chat. | Both |
+| `/group new <name>` | Makes a Group with the sender as its only Member. | Private |
+| `/group rename <name>` | Renames the Group. | Both |
+| `/group invite` | Shows the Group's Invite code as a join link or a Join button. | Both |
+| `/group link` | Sends an "Add to a group chat" button. | Private |
+| `/group unlink` | Removes the link between the Group and its chat. | Both |
+| `/member add <name>` | Adds a Placeholder Member. | Both |
+| `/member rename <name> <new name>` | Renames a Placeholder Member. `/member rename me <new name>` renames the sender. | Both |
+| `/member remove <name>` | Removes a Placeholder Member that has no Postings. | Both |
+| `/member claim <name>` | Issues a single-use Invite code for a Claim of that Placeholder Member. | Both |
+| `/account` | Lists the sender's Accounts with their balances. | Private |
+| `/account new <name> [opening balance]` | Makes an Account. The opening balance defaults to 0. | Private |
+| `/account rename <name> <new name>` | Renames an Account. | Private |
+| `/account opening <name> <amount>` | Changes the amount of an Account's opening balance. | Private |
+| `/account default <name>` | Makes an Account the Default Account. | Private |
+| `/account delete <name>` | Deletes an Account. | Private |
+
+- A new name runs to the end of the line or the next `key:`, so `/group new Lisbon trip` works. An existing name is one word, typed as in "Names".
+- An opening balance may be zero or below zero, as for a credit card. This is the only amount that may be.
+- `/account` in a group chat records nothing. The bot replies with an "Open private chat" button.
+- **Which Group**: in a group chat, the command always acts on the linked Group, and `in:` gets the same problem as for recording. In the private chat, `in:` names the Group. Without `in:`, the Group is the sender's only Group besides their Personal Group. If they have none or several, it is a problem that lists them.
+
+### Signing up and the first Account
+
+- At sign-up, Kitty makes the User, their Personal Group, and their Untracked money. It makes no other Account, and it asks no setup questions.
+- Until a User makes an Account, they have no Default Account. Their own side of a Transaction uses Untracked money, and the receipt says so. Income gets a problem that asks them to make an Account first.
+- A User's first Account becomes their Default Account. Moving earlier payments into it is a normal edit, and ADR 0012's correction keeps its balance right.
+
+### Accounts
+
+- Account names are unique among one User's Accounts. "untracked" is reserved for Untracked money.
+- Changing an opening balance changes its amount only. Its timestamp stays the time the Account was made (ADR 0012).
+- Any Account except Untracked money can be the Default Account.
+- An Account can be deleted only while its only Posting is the opening balance. The Default Account and Untracked money can never be deleted.
+
+### Groups from a group chat
+
+- In a chat with no linked Group, `/start@kitty_bot` makes a Group named after the chat title. Kitty links the chat to it, and the sender becomes its first Member. The bot posts a Join button.
+- If the title is "Personal", or has no letters or digits (such as "🏠🏠" or "!!!"), the Group is named "Group chat". The reply asks for a `/group rename`.
+- The sender must be a User. Otherwise Kitty makes nothing, and the bot replies with a "Sign up first" button. Messages from anonymous admins are ignored.
+- In a chat that is already linked, `/start@kitty_bot` posts the Join button again.
+
+### Joining with an Invite code
+
+- Each Group has one Invite code, and many people can use it. A Channel shows it as a link: the Join button and the join link are the deep link `t.me/kitty_bot?start=<code>`.
+- The link opens the private chat. A User joins at once. A new person first sees the privacy notice and taps "I agree". The Group gets a Notification.
+- An Invite code for a Claim works once and is tied to one Placeholder Member (ADR 0011). `/member claim` always sends it to the sender's private chat. In a group chat, the bot posts "Sent to you privately".
+- Expiry, cancelling a code, and leaving a Group are not decided yet.
+
+### Linking a Group to a group chat
+
+- A chat is linked to at most one Group, and a Group to at most one chat in each Channel. A link to a chat or Group that already has one gets a problem that says to send `/group unlink` first.
+- Any Member may link or unlink. Every Member gets a Notification.
+- `/group link` sends an "Add to a group chat" button, the deep link `t.me/kitty_bot?startgroup=<code>`. The Member picks a chat, Telegram adds the bot if needed, and the bot gets `/start@kitty_bot <code>` there and links the chat. The code works once, stops working after 1 hour, and a new `/group link` cancels it.
+- Removing the bot from the chat keeps the link. If the bot is added again, the chat works with its Group at once.
+- A Group's own id never changes. The link stores the Telegram chat id as a value that can change. When a group becomes a supergroup, the bot sends the backend the new chat id. It does this when it sees `migrate_to_chat_id` or `migrate_from_chat_id`, or when a send fails with `migrate_to_chat_id`. After a failed send, it also sends again.
+
+### Group names
+
+- Group names need not be unique. A User who joins a second Group with the same name as one of theirs gets a warning that `in:` matches both, and a pointer to `/group rename`.
+- Any Member may rename a Group. Every Member gets a Notification.
+- A Group name doesn't follow the chat title after the Group is made.
+- "Personal" is reserved for Personal Groups. A Personal Group can't be renamed, has no Invite codes or Placeholder Members, and can't be linked to a chat.
+
+### Member names
+
+- A name belongs to the Member, so one User can be "Ben" in one Group and "Dad" in another.
+- A User who joins is named after their Telegram first name. Later changes in Telegram don't change it.
+- Names are unique among a Group's current Members. If the first name is taken, Kitty adds the first letter of the last name, as in "Ben N.". If that is taken too, or there is no last name, Kitty adds a number, as in "Ben 2". The bot tells the new Member how to rename.
+- `me` and names starting with `@` are reserved.
+- Only a User renames their own Member. Any Member renames a Placeholder Member (ADR 0011).
+- After a Claim, the Member keeps the Placeholder Member's name until its User renames it.
+- A former Member's name is free for others to use.
+
+### Examples
+
+Ana, Ben, and Cara are Users. Dad is a Placeholder Member.
+
+**Signing up**
+
+| Step | What happens |
+|---|---|
+| Ana starts the bot and taps "I agree" | Kitty makes her User, her Personal Group, and her Untracked money. She has no Default Account yet. |
+| `/expense 4.50 coffee` | Recorded in Personal, from Untracked money. The receipt says: "From Untracked money. Add your Accounts with `/account new`." |
+| `/income 2400` | A problem: "Make an Account first." |
+| `/account new bank 150` | Bank opens at €150. It is her first Account, so it becomes her Default Account. |
+| Ana edits the coffee to `from:bank` | Bank still shows €150. The coffee happened before Bank opened, so Kitty adds a correction (ADR 0012). |
+| `/expense 3 coffee` | From Bank, her Default Account. |
+
+**Accounts, in Ana's private chat**
+
+| Command | What happens |
+|---|---|
+| `/account` | Lists her Accounts with their balances, and marks Bank as the Default Account. |
+| `/account new cash` | Cash opens at 0. |
+| `/account new visa -320` | Visa opens at −€320, a credit card debt. |
+| `/account opening cash 40` | Cash's opening balance becomes €40. The time it opened stays the same. |
+| `/account rename visa credit-card` | Visa becomes "Credit card". |
+| `/account default cash` | Cash becomes the Default Account. |
+| `/account default untracked` | A problem: Untracked money can't be the Default Account. |
+| `/account new Bank` | A problem: Ana already has an Account named Bank. |
+| `/account new untracked` | A problem: the name is reserved. |
+| `/account delete credit-card` | Deleted, because it has only its opening balance. |
+| `/account delete bank` | A problem: Bank has Transactions. |
+| `/account delete cash` | A problem: Cash is the Default Account. |
+| `/account` in a group chat | Records nothing. The bot replies with an "Open private chat" button. |
+
+**A Group from a group chat**
+
+| Step | What happens |
+|---|---|
+| Ana adds the bot to the chat "Flat 3B" and sends `/start@kitty_bot` | Kitty makes Flat 3B and links the chat. Ana is its first Member. The bot posts "Flat 3B is ready" with a Join button. |
+| Ben taps Join | His private chat opens, and he joins at once. The group chat gets "Ben joined Flat 3B". |
+| Cara taps Join | She is new to Kitty. She sees the privacy notice, taps "I agree", and joins. |
+| Ben taps Join again | "You are already in Flat 3B." |
+| Someone sends `/start@kitty_bot` again | The bot posts the Join button again, with the same Invite code. |
+| Dan, who is not a User, sends `/start@kitty_bot` in a new chat | Kitty makes nothing. The bot replies with a "Sign up first" button. |
+| An anonymous admin sends `/start@kitty_bot` | Ignored. |
+| Ana sends `/start@kitty_bot` in a chat titled "🏠🏠" | Kitty makes a Group named "Group chat". The reply asks for a `/group rename`. |
+
+**A Group from the private chat**
+
+| Step | What happens |
+|---|---|
+| `/group new Lisbon trip` | Kitty makes Lisbon trip with Ana as its only Member. The bot replies with a join link to share and an "Add to a group chat" button. |
+| Ben taps the join link Ana sent him | He joins Lisbon trip. |
+| `/group invite` | If Lisbon trip is Ana's only Group besides Personal, the bot shows its join link. If she is also in Flat 3B, it is a problem that lists both, and she sends `/group invite in:lisbon`. |
+
+**Linking a Group to a chat**
+
+| Step | What happens |
+|---|---|
+| `/group link in:lisbon` | The bot replies with an "Add to a group chat" button. The button works once, for 1 hour. |
+| Ana taps it and picks the chat "Portugal 🇵🇹" | The chat now records for Lisbon trip. Every Member gets a Notification. |
+| Ben taps a forwarded copy of the same button | A problem: the button has already been used. |
+| Ana links Lisbon trip to a second chat | A problem: Lisbon trip already has a chat. Send `/group unlink` first. |
+| Ana links Flat 3B to "Portugal 🇵🇹" | A problem: this chat already records for Lisbon trip. |
+| Cara removes the bot from "Flat 3B", then adds it again | The chat still records for Flat 3B. Kitty makes no new Group. |
+| `/group unlink` in the "Flat 3B" chat | The link is removed. Flat 3B and its Transactions stay. |
+
+**When Telegram changes the chat id**
+
+| Step | What happens |
+|---|---|
+| The chat "Flat 3B" becomes a supergroup | The bot sends the new chat id to the backend, which updates the link. Flat 3B's own id doesn't change. |
+| Someone taps Edit on an old receipt | It works as before. |
+| A send to the old chat id fails | The bot updates the link and sends again. |
+
+**Group names**
+
+| Step | What happens |
+|---|---|
+| `/group rename Flat 3C` in the Flat 3B chat | Renamed. Every Member gets a Notification. |
+| Someone changes the chat title to "Flat 3C 🎄" | The Group name stays "Flat 3C". |
+| Ana, already in "Flat", joins Ben's new Group "Flat" | The join works. The bot warns: "You now have two Groups named Flat, so `in:flat` matches both. Rename one with `/group rename`." |
+| `/expense 20 groceries in:flat` in Ana's private chat | A problem: two Groups match. The reply lists both. |
+| `/group new Personal` | A problem: "Personal" is reserved. |
+| `/group rename Home in:personal` | A problem: a Personal Group can't be renamed. |
+| `/group invite in:personal` | A problem: no one can join a Personal Group. |
+| `/group link in:personal` | A problem: a Personal Group can't have a chat. |
+
+**Member names**
+
+| Step | What happens |
+|---|---|
+| Ben Kowalski joins Flat 3B | His Member name is "Ben". |
+| Ben Novak joins | His Member name is "Ben N.". The bot tells him: "Change it with `/member rename me <name>`." |
+| A third Ben, with no last name, joins | His Member name is "Ben 2". |
+| Ben Novak sends `/member rename me Benny` | He is "Benny" in Flat 3B. His names in other Groups don't change. |
+| Cara sends `/member rename me Ben` | A problem: Flat 3B already has a Ben. |
+| Cara sends `/member rename ben Bob` | A problem: only Ben may rename Ben. |
+| Ben changes his Telegram name to "Benji" | His Member name stays "Ben". |
+| `/member rename me @cara` or `/member rename me me` | A problem: these names are reserved. |
+
+**Placeholder Members, in the Lisbon trip chat**
+
+| Command | What happens |
+|---|---|
+| `/member add Dad` | Dad is added as a Placeholder Member. |
+| `/expense 60 eating-out by:dad` | Dad paid, from his own Untracked money. |
+| `/member rename dad Father` | Renamed. Any Member may do this. |
+| `/member remove father` | A problem: Father has Postings. |
+| `/member claim father` | The bot sends Ana a single-use Invite code in her private chat and posts "Sent to you privately". Dad joins with it and becomes that Member. Every Member gets a Notification, and the Member stays "Father" until Dad renames it. |
+| `/member add Dad in:personal` | A problem: a Personal Group has no Placeholder Members. |
 
 ## Later: line, then card
 
