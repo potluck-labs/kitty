@@ -13,4 +13,4 @@ Postings never change. An edit adds cancelling Postings and new Postings as a nu
 
 ## Consequences
 
-Erasure and retention purges must still remove personal data, so append-only has that one exception. Data protection rules for Users and Groups defines how, and a shared Transaction's amounts must stay correct.
+Erasure and retention purges must still remove personal data, so append-only has that one exception. ADR 0009 defines how: Erasure moves shared Postings to a placeholder Member, so a shared Transaction's amounts stay correct.

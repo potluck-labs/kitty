@@ -24,6 +24,10 @@ _Avoid_: Team, household, room
 A User's place in one Group.
 _Avoid_: Participant, groupmate
 
+**Erasure**:
+Removing a User from Kitty, at their request or after long inactivity. Their shared Transactions stay with a placeholder Member.
+_Avoid_: Account deletion, delete account, unsubscribe
+
 **Invite code**:
 A code Kitty issues so a User can join a Group. A Channel may show it as a link, but the code belongs to Kitty.
 _Avoid_: Invite link, Telegram link
