@@ -13,4 +13,4 @@ Postings never change. An edit adds cancelling Postings and new Postings as a nu
 
 ## Consequences
 
-Erasure and retention purges must still remove personal data, so append-only has that one exception. ADR 0009 defines how: Erasure moves shared Postings to a placeholder Member, so a shared Transaction's amounts stay correct.
+Postings move to another Book in two cases, the only exceptions to append-only. Erasure and retention purges must still remove personal data, and ADR 0009 defines how: Erasure moves shared Postings to a Placeholder Member, so a shared Transaction's amounts stay correct. A Claim moves a Placeholder Member's Postings into the claiming User's Book (ADR 0011).

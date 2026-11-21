@@ -21,11 +21,19 @@ A set of one or more people who record shared Transactions together. A Group wit
 _Avoid_: Team, household, room
 
 **Member**:
-A User's place in one Group.
+A User's place in one Group, or a Placeholder Member.
 _Avoid_: Participant, groupmate
 
+**Placeholder Member**:
+A Member with no User behind it, added by name so the person can pay or have a Share before they join. It is the Members' own note about someone and has no rights.
+_Avoid_: Guest, ghost, dummy member
+
+**Claim**:
+A User taking over a Placeholder Member, so that Member becomes theirs. The User claims by joining with an Invite code tied to that Placeholder Member.
+_Avoid_: Merge, link, adopt
+
 **Erasure**:
-Removing a User from Kitty, at their request or after long inactivity. Their shared Transactions stay with a placeholder Member.
+Removing a User from Kitty, at their request or after long inactivity. Their shared Transactions stay with a Placeholder Member.
 _Avoid_: Account deletion, delete account, unsubscribe
 
 **Invite code**:
@@ -47,8 +55,12 @@ A place that holds one User's money, such as cash or a bank account, with an ope
 _Avoid_: Wallet, source, bank
 
 **Default Account**:
-The one Account of a User that receives Loans and Settlements paid to them. Every User always has one.
+The Account Kitty picks first when a User records a Transaction themselves. Every User always has one, and it is never Untracked money.
 _Avoid_: Main account, primary account
+
+**Untracked money**:
+The Account that holds money someone else recorded on a User's or Placeholder Member's behalf, until the owner moves it to a real Account. Every User has one for all their Groups, and every Placeholder Member has its own.
+_Avoid_: Unknown account, pending account
 
 ## Transactions
 
@@ -87,6 +99,10 @@ _Avoid_: Participant, involved Member
 **Ledger account**:
 Anything Postings add up to, such as a User's Account, a User's Category total, or what one Member owes another.
 _Avoid_: Account, bucket
+
+**Book**:
+All the Ledger accounts of one User or Placeholder Member, and the Postings on them. Each person's balances come only from their own Book.
+_Avoid_: Ledger, wallet
 
 ## Balances
 
