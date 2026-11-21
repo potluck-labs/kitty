@@ -121,7 +121,7 @@ One Member's part of a Split, in money.
 _Avoid_: Portion, cut
 
 **Category**:
-The label that says what an Expense was for, such as groceries or utilities.
+The label that says what an Expense was for, such as groceries or utilities. Each Group has its own Categories, which its Members manage.
 _Avoid_: Type, tag
 
 **Category total**:

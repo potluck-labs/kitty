@@ -47,7 +47,7 @@ Fixed arguments come first, in order. Options follow in any order. An option's v
 - An exact match wins. Otherwise a prefix that matches exactly one item wins, so `eat` works.
 - A Member is named by their Telegram @username, by a tap-to-mention for people with no username, or by their name, matched the same way. `me` is the sender. The Member must be in the Group the command goes to.
 - Zero matches, or two or more, is a problem. The usage reply lists the candidates.
-- A Category must already exist. An unknown name gets a problem with the closest candidates, and the bot never creates it.
+- A Category must already exist in the Group the command goes to. An unknown name gets a problem with the closest candidates and a pointer to `/category new`, and the bot never creates it.
 
 ### Splits
 
@@ -68,7 +68,7 @@ Fixed arguments come first, in order. Options follow in any order. An option's v
 
 - `/transfer` and `/income` in a group chat record nothing. The bot replies with an "Open private chat" button.
 - A receipt in a group chat leaves out the Account, because other Members never see a Member's Accounts. When the sender is the Payer, they get a private line, "Paid from your Cash (default)". When another Member's money moved, that Member gets a Notification that it went to their Untracked money, and it lets them pick an Account. A receipt in the private chat names the Account.
-- Command menus differ by chat type. In private chats: `/expense /transfer /income /loan /settle /balance /stats /group /member /account /help /privacy /export /erase`. In group chats: `/expense /loan /settle /balance /stats /group /member /help`.
+- Command menus differ by chat type. In private chats: `/expense /transfer /income /loan /settle /balance /stats /group /member /category /account /help /privacy /export /erase`. In group chats: `/expense /loan /settle /balance /stats /group /member /category /help`.
 
 ### Edit and Delete
 
@@ -348,6 +348,61 @@ Ana, Ben, and Cara are Users. Dad is a Placeholder Member.
 | `/member remove father` | A problem: Father has Postings. |
 | `/member claim father` | The bot sends Ana a single-use Invite code in her private chat and posts "Sent to you privately". Dad joins with it and becomes that Member. Every Member gets a Notification, and the Member stays "Father" until Dad renames it. |
 | `/member add Dad in:personal` | A problem: a Personal Group has no Placeholder Members. |
+
+## Categories
+
+Decided in [Who owns Categories and how Members manage them](https://github.com/potluck-labs/kitty/issues/41). These commands follow the grammar above: fixed arguments, then `key:value` options, and names matched as in "Names".
+
+### Who owns them
+
+- Every Group owns its own Categories, and that includes Personal Groups. Flat 3B's "Groceries" and Lisbon trip's "Groceries" are two Categories.
+- A new Group starts with these 11, in this order: Groceries, Eating out, Household, Rent, Utilities, Transport, Travel, Entertainment, Shopping, Gifts, Other. They are stored in English, and the bot shows them as stored.
+- No default Category names health, religion, or donations (Art. 9). A Group may make such a Category itself.
+- Any Member may add, rename, or delete a Category. Placeholder Members and former Members can't. Nobody gets a Notification.
+
+### Commands
+
+| Command | What it does | Where |
+|---|---|---|
+| `/category` | Lists the Group's Categories. | Both |
+| `/category new <name>` | Adds a Category. | Both |
+| `/category rename <name> <new name>` | Renames a Category. | Both |
+| `/category delete <name>` | Deletes a Category that no Expense uses. | Both |
+
+- The Group is chosen as for `/group`: in a group chat, the linked Group. In the private chat, `in:` or the sender's only Group besides their Personal Group. `/category in:personal` reaches the Personal Group.
+- A new name runs to the end of the line or the next `key:`, so `/category new Climbing gear` works. An existing name is one word, typed as in "Names".
+
+### Rules
+
+- Names are unique within a Group under the matching rule in "Names", so a Group can't have both "Eating out" and "eating-out". A name has at least one letter or digit and at most 32 characters. No name is reserved.
+- Renaming a Category relabels every Expense in it, because an Expense points to the Category, not to its name.
+- A Category can be deleted only while no Posting in any revision uses it. A Category that is in use is renamed instead.
+- A Group always keeps at least one Category, so the last one can't be deleted. "Other" is an ordinary Category.
+- When a recording command names an unknown Category, the usage reply lists the closest Categories and suggests `/category new <name>`. The bot still never makes a Category on the spot.
+
+### Category totals across Groups
+
+- The personal view of Category totals adds up Categories whose names match under the rule in "Names". So Flat 3B's "Groceries" and Lisbon trip's "groceries" are one row, and "Food" stays its own row.
+- A row has the name, the amount, and the ids of the Categories behind it. Its name is the name of the Category with the largest amount in the row.
+- With a Group filter, every row is one Category.
+
+### Examples
+
+Ana is in Personal, Flat 3B (with Ben and Cara), and Lisbon trip (with Ben).
+
+| Command | What happens |
+|---|---|
+| `/category` in the Flat 3B chat | Lists Flat 3B's Categories, starting with the 11 defaults. |
+| `/category new Climbing gear` in the Flat 3B chat | Flat 3B gets the Category "Climbing gear". Lisbon trip doesn't. |
+| `/category new climbing-gear` in the Flat 3B chat | A problem: Flat 3B already has "Climbing gear". |
+| `/category new Climbing gear in:lisbon` in Ana's private chat | Lisbon trip gets its own "Climbing gear". |
+| `/category rename eating-out Restaurants` in the Flat 3B chat | Every Flat 3B Expense in Eating out now shows Restaurants. Lisbon trip's Eating out doesn't change. |
+| `/category delete rent` in the Flat 3B chat | Deleted, because no Expense uses it. |
+| `/category delete groceries` in the Flat 3B chat | A problem: Expenses use Groceries. Rename it instead. |
+| `/category delete other` when Other is Flat 3B's last Category | A problem: a Group keeps at least one Category. |
+| `/expense 36.90 lunch` in the Flat 3B chat | A problem: no Category is named "lunch". The reply lists the closest ones and suggests `/category new lunch`. |
+| `/category new Pharmacy in:personal` in Ana's private chat | Ana's Personal Group gets "Pharmacy". It is her own choice, not a default. |
+| `/stats` in Ana's private chat | Groceries from Personal, Flat 3B, and Lisbon trip is one row. Flat 3B's Restaurants and Lisbon trip's Eating out are two rows. |
 
 ## Later: line, then card
 
